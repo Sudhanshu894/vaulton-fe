@@ -1,36 +1,108 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# Vaulton: The Ultimate Keyless Wallet on Stellar
 
-## Getting Started
+Vaulton is a premium, biometric-first keyless wallet designed to bridge the gap between traditional ease-of-use and blockchain security. By leveraging **Passkey** technology and **Account Abstraction on Stellar**, we eliminate the need for complex seed phrases, making crypto transactions as simple as a biometric scan.
 
-First, run the development server:
+## 🚀 Project Overview
+Vaulton is a Web3 self-custody wallet that prioritizes user experience without compromising security. It allows users to onboard using their device's native biometrics (Face ID, Touch ID, or Windows Hello) to create a smart contract-based account on the Stellar network.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+### What it Solves
+1.  **Seed Phrase Barrier**: Eliminates the risk of losing private keys or seed phrases.
+2.  **Onboarding Friction**: Users can create a wallet in seconds with a biometric scan.
+3.  **Complex Transaction Signing**: Every transaction is signed using hardware-level secure enclaves (Secure Enclave on Mac/iOS).
+4.  **Gas Management**: Implements a Paymaster-based gasless experience, so users don't need to hold XLM for fees.
+5.  **Payment Automation**: Introduces "Immutable Autopay" for hands-free scheduled transactions.
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+---
 
-You can start editing the page by modifying `app/page.js`. The page auto-updates as you edit the file.
+## 🛠 Tech Stack
+- **Frontend**: [Next.js 16](https://nextjs.org/) (App Router), React 19.
+- **Styling & Animation**: [Tailwind CSS 4](https://tailwindcss.com/), [Framer Motion](https://www.framer.com/motion/).
+- **Authentication**: [WebAuthn / Passkeys](https://webauthn.guide/) via `@simplewebauthn/browser`.
+- **Blockchain Interface**: Stellar Network (Optimized for USDC).
+- **PWA**: [next-pwa](https://www.npmjs.com/package/next-pwa) for a native app-like experience.
+- **Backend**: Dedicated Node.js API for Smart Account orchestration and transaction relaying (Paymaster).
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+---
 
-## Learn More
+## ✨ Features & USPs
+Vaulton is built on the principle of **"Biometric Citadel"**—security that is invisible yet impenetrable.
 
-To learn more about Next.js, take a look at the following resources:
+### 1. Biometric Citadel (Passkey Authentication)
+Your biometrics are the only key. By using WebAuthn, we store no passwords or private keys on our servers. Your private key is securely managed by your device's hardware, ensuring only you can authorize transactions.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### 2. The Gasless Protocol
+Vaulton leverages Stellar's account abstraction capabilities to provide a gasless experience. Transactions are covered by a background paymaster, allowing users to send USDC without worrying about holding base tokens (XLM) for network fees.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### 3. Immutable Autopay (Scheduled Transactions)
+Set it and forget it. Our Autopay system allows you to schedule USDC payments for recurring bills or subscriptions. Once scheduled, the protocol handles the execution reliably.
+> *"We cannot tamper with the transactions while the auto-pay system is making payments, ensuring absolute reliability."*
 
-## Deploy on Vercel
+### 4. Native PWA Experience
+Vaulton can be installed directly onto your mobile or desktop home screen as a Progressive Web App, providing a fast, full-screen interface without the need for an app store.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+---
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## 🔄 User Flow
+1.  **Onboarding**: Click "Get Started" and perform a biometric scan to register a new Smart Account.
+2.  **Dashboard**: View your USDC balance and transaction history in a clean, minimalist interface.
+3.  **Transact**: Send USDC to any wallet address. The transaction is authorized via a biometric scan and relayed gaslessly.
+4.  **Autopay**: Schedule upcoming payments by setting a date and recipient. Manage your active, successful, and cancelled schedules in the dedicated log.
+5.  **Support & FAQ**: Access instant support or browse our interactive FAQ for quick assistance.
+
+---
+
+## 💻 Local Setup & Installation
+
+Follow these steps to run Vaulton on your local machine:
+
+### Prerequisites
+- Node.js (v20.x or higher recommended)
+- npm or yarn
+
+### Steps
+1.  **Clone the Repository**
+    ```bash
+    git clone https://github.com/[Your-Username]/vaulton-fe.git
+    cd vaulton-fe
+    ```
+
+2.  **Install Dependencies**
+    ```bash
+    npm install
+    ```
+
+3.  **Environment Configuration**
+    Create a `.env` file in the root directory and add your backend API URL (optional if using default):
+    ```env
+    NEXT_PUBLIC_API_URL=https://vaulton-backend-f8c2dge3b7fwfch6.centralindia-01.azurewebsites.net
+    ```
+
+4.  **Run Development Server**
+    ```bash
+    npm run dev
+    ```
+    The application will be available at `http://localhost:3000`.
+
+5.  **Build for Production**
+    ```bash
+    npm run build
+    npm start
+    ```
+
+---
+
+## ❓ Q&A / FAQs
+
+**Q: Is Vaulton custodial?**
+**A:** No. Vaulton is a self-custody wallet. Your keys are generated and stored in your device's Secure Enclave/TPM via Passkeys. We never have access to your keys.
+
+**Q: Why use Stellar for this?**
+**A:** Stellar offers lightning-fast settlement and robust support for stablecoins like USDC. Combined with our account abstraction layer, it provides the perfect infrastructure for global, gasless payments.
+
+**Q: Can I use Vaulton on multiple devices?**
+**A:** Yes. Since we use Passkeys, you can sync your credentials across your Apple iCloud or Google account devices, or add new biometric devices to your account profile.
+
+---
+
+## 🛡 Security & Reliability
+Vaulton is designed with a **Trust-Zero Architecture**. Every user interaction is cryptographically verified against the registered Passkey public key on-chain, ensuring that even if the UI or backend is compromised, your funds remain safe under your biometric control.

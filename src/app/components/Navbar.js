@@ -21,6 +21,7 @@ const WASM_HASH = process.env.NEXT_PUBLIC_WASM_HASH;
 export default function Navbar() {
     const router = useRouter();
     const [isMenuOpen, setIsMenuOpen] = useState(false);
+    const [isRefreshingBalance, setIsRefreshingBalance] = useState(false);
 
     // Auth State
     const [user, setUser] = useState(null); // { userId, smartAccountId, ... }
@@ -57,6 +58,7 @@ export default function Navbar() {
 
     const fetchBalance = async (childId) => {
         if (!childId) return;
+        setIsRefreshingBalance(true);
         try {
             const data = await getUSDCBalance(childId);
             if (!data.error) {
@@ -64,6 +66,8 @@ export default function Navbar() {
             }
         } catch (error) {
             console.error("Failed to fetch balance", error);
+        } finally {
+            setIsRefreshingBalance(false);
         }
     };
 

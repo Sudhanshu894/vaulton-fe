@@ -418,20 +418,39 @@ export default function ScheduledTransactionsPage() {
                     {/* Right Column: List & Filters */}
                     <div className="lg:col-span-2 space-y-6">
 
-                        {/* Filter Tabs */}
-                        <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-hide">
-                            {['all', 'pending', 'success', 'failed', 'cancelled'].map((status) => (
-                                <button
-                                    key={status}
-                                    onClick={() => handleFilterChange(status)}
-                                    className={`px-5 py-2 rounded-full text-sm font-bold capitalize whitespace-nowrap transition-all ${filterStatus === status
-                                        ? 'bg-[#1A1A2E] text-white shadow-lg'
-                                        : 'bg-white text-gray-500 hover:bg-gray-50 border border-gray-100'
-                                        }`}
+                        {/* Filter Tabs & Refresh */}
+                        <div className="flex items-center justify-between gap-4">
+                            <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-hide">
+                                {['all', 'pending', 'success', 'failed', 'cancelled'].map((status) => (
+                                    <button
+                                        key={status}
+                                        onClick={() => handleFilterChange(status)}
+                                        className={`px-5 py-2 rounded-full text-sm font-bold capitalize whitespace-nowrap transition-all ${filterStatus === status
+                                            ? 'bg-[#1A1A2E] text-white shadow-lg'
+                                            : 'bg-white text-gray-500 hover:bg-gray-50 border border-gray-100'
+                                            }`}
+                                    >
+                                        {status}
+                                    </button>
+                                ))}
+                            </div>
+                            <button
+                                onClick={() => user?.smartAccountId && fetchTransactions(user.smartAccountId, page, filterStatus)}
+                                className="p-2 hover:bg-gray-100 rounded-lg transition-colors text-gray-400 hover:text-[#1A1A2E] shrink-0"
+                                disabled={isLoading}
+                                title="Refresh Schedules"
+                            >
+                                <motion.svg
+                                    className="w-5 h-5"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                    animate={isLoading ? { rotate: 360 } : { rotate: 0 }}
+                                    transition={isLoading ? { duration: 1, repeat: Infinity, ease: "linear" } : { duration: 0.5, ease: "easeOut" }}
                                 >
-                                    {status}
-                                </button>
-                            ))}
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                </motion.svg>
+                            </button>
                         </div>
 
                         {/* Transactions List - Scrollable Container */}

@@ -430,10 +430,19 @@ export default function Support() {
                             <button
                                 onClick={() => user?.smartAccountId && fetchTickets(user.smartAccountId, page)}
                                 className="p-2 hover:bg-gray-100 rounded-lg transition-colors text-gray-400 hover:text-[#1A1A2E]"
+                                disabled={isLoading}
+                                title="Refresh Tickets"
                             >
-                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <motion.svg
+                                    className="w-5 h-5"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                    animate={isLoading ? { rotate: 360 } : { rotate: 0 }}
+                                    transition={isLoading ? { duration: 1, repeat: Infinity, ease: "linear" } : { duration: 0.5, ease: "easeOut" }}
+                                >
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                                </svg>
+                                </motion.svg>
                             </button>
                         </div>
 

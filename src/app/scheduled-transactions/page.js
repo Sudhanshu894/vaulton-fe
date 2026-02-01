@@ -53,12 +53,13 @@ export default function ScheduledTransactionsPage() {
             if (sendingTxs.length === 0) return;
 
             // Poll independently for each "Sending" transaction
-            sendingTxs.forEach(async (tx) => {
+            await Promise.all(sendingTxs.map(async (tx) => {
                 try {
                     const data = await getScheduledTransactionById(tx._id);
                     if (data.scheduledTransactions && data.scheduledTransactions.length > 0) {
-                        const updatedTx = data.scheduledTransactions[0];
-                        if (updatedTx.status !== 'pending') {
+                        // Find the exact transaction in the response to be safe
+                        const updatedTx = data.scheduledTransactions.find(t => t._id === tx._id);
+                        if (updatedTx && updatedTx.status !== 'pending') {
                             // Status changed! Update local state
                             setTransactions(prev => prev.map(t =>
                                 t._id === tx._id ? updatedTx : t
@@ -72,12 +73,15 @@ export default function ScheduledTransactionsPage() {
                 } catch (err) {
                     console.error("Polling error for", tx._id, err);
                 }
-            });
+            }));
         };
 
-        const pollTimer = setInterval(checkSendingTransactions, 10000); // Poll every 10s
+        // Run once immediately
+        checkSendingTransactions();
+
+        const pollTimer = setInterval(checkSendingTransactions, 5000); // Poll every 5s
         return () => clearInterval(pollTimer);
-    }, [transactions]);
+    }, [transactions, user?.smartAccountId]);
 
     // Load user on mount
     useEffect(() => {
@@ -152,6 +156,18 @@ export default function ScheduledTransactionsPage() {
 
         if (recipient.trim() === user.smartAccountId) {
             alert("Recipient address cannot be your own address.");
+            setIsSubmitting(false);
+            return;
+        }
+
+        if (pendingCount > 0) {
+            alert("You cannot add a new autopay transaction until your last one is completed (Success, Failed, or Cancelled).");
+            setIsSubmitting(false);
+            return;
+        }
+
+        if (new Date(scheduledDate) <= new Date()) {
+            alert("Please select a future date and time for the autopay.");
             setIsSubmitting(false);
             return;
         }
@@ -358,15 +374,28 @@ export default function ScheduledTransactionsPage() {
                                 </div>
                             ) : (
                                 <form onSubmit={handleCreate} className="space-y-5">
+                                    {pendingCount > 0 && (
+                                        <div className="bg-amber-50 border border-amber-100 rounded-xl p-4 mb-4">
+                                            <div className="flex gap-3">
+                                                <svg className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                                </svg>
+                                                <p className="text-sm text-amber-700 leading-relaxed font-medium">
+                                                    You can't add a new autopay transaction until your last one is either Success, Failed, or Cancelled.
+                                                </p>
+                                            </div>
+                                        </div>
+                                    )}
                                     <div>
                                         <label className="block text-sm font-bold text-gray-700 mb-2">Recipient Address</label>
                                         <input
                                             type="text"
                                             required
+                                            disabled={pendingCount > 0}
                                             value={recipient}
                                             onChange={(e) => setRecipient(e.target.value)}
                                             placeholder="G..."
-                                            className="w-full px-4 py-3 rounded-xl bg-gray-50 border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition-all font-mono text-sm"
+                                            className="w-full px-4 py-3 rounded-xl bg-gray-50 border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition-all font-mono text-sm disabled:opacity-50"
                                         />
                                     </div>
 
@@ -376,10 +405,11 @@ export default function ScheduledTransactionsPage() {
                                             type="number"
                                             step="0.01"
                                             required
+                                            disabled={pendingCount > 0}
                                             value={amount}
                                             onChange={(e) => setAmount(e.target.value)}
                                             placeholder="0.00"
-                                            className="w-full px-4 py-3 rounded-xl bg-gray-50 border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition-all font-mono text-sm"
+                                            className="w-full px-4 py-3 rounded-xl bg-gray-50 border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition-all font-mono text-sm disabled:opacity-50"
                                         />
                                         <div className="flex justify-between mt-1 px-1">
                                             <p className="text-[11px] text-gray-400">Available Balance:</p>
@@ -394,9 +424,11 @@ export default function ScheduledTransactionsPage() {
                                         <input
                                             type="datetime-local"
                                             required
+                                            disabled={pendingCount > 0}
+                                            min={new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16)}
                                             value={scheduledDate}
                                             onChange={(e) => setScheduledDate(e.target.value)}
-                                            className="w-full px-4 py-3 rounded-xl bg-gray-50 border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition-all text-sm"
+                                            className="w-full px-4 py-3 rounded-xl bg-gray-50 border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition-all text-sm disabled:opacity-50"
                                         />
                                         <p className="text-xs text-gray-400 mt-2">
                                             Transaction will be executed automatically at this time.
@@ -405,10 +437,10 @@ export default function ScheduledTransactionsPage() {
 
                                     <button
                                         type="submit"
-                                        disabled={isSubmitting}
+                                        disabled={isSubmitting || pendingCount > 0}
                                         className="w-full py-4 bg-[#1A1A2E] text-white rounded-xl font-bold shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/40 hover:-translate-y-0.5 transition-all disabled:opacity-70 disabled:cursor-not-allowed cursor-pointer"
                                     >
-                                        {isSubmitting ? 'Signing...' : 'Schedule Payment'}
+                                        {isSubmitting ? 'Signing...' : (pendingCount > 0 ? 'Pending Request Active' : 'Schedule Payment')}
                                     </button>
                                 </form>
                             )}

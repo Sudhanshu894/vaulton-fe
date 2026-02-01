@@ -23,7 +23,7 @@ Vaulton is a Web3 self-custody wallet that prioritizes user experience without c
 ## Tech Stack
 - **Frontend**: [Next.js 16](https://nextjs.org/) (App Router), React 19.
 - **Styling & Animation**: [Tailwind CSS 4](https://tailwindcss.com/), [Framer Motion](https://www.framer.com/motion/).
-- **Authentication**: [WebAuthn / Passkeys](https://webauthn.guide/) via `@simplewebauthn/browser`.
+- **Authentication**: [WebAuthn / Passkeys](https://webauthn.guide/).
 - **Blockchain Interface**: Stellar Network (Optimized for USDC).
 - **PWA**: [next-pwa](https://www.npmjs.com/package/next-pwa) for a native app-like experience.
 - **Backend**: Dedicated Node.js API for Smart Account orchestration and transaction relaying (Paymaster).

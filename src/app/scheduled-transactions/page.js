@@ -33,6 +33,10 @@ export default function ScheduledTransactionsPage() {
     const [page, setPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
 
+    // Refs for stable polling
+    const transactionsRef = { current: transactions };
+    useEffect(() => { transactionsRef.current = transactions; }, [transactions]);
+
     // Timer state for countdowns
     const [now, setNow] = useState(new Date());
 
@@ -42,46 +46,32 @@ export default function ScheduledTransactionsPage() {
         return () => clearInterval(timer);
     }, []);
 
-    // Polling for "Sending" transactions
+    // Polling for non-terminal transactions
     useEffect(() => {
-        const checkSendingTransactions = async () => {
+        const checkTransactions = async () => {
+            if (!user?.smartAccountId) return;
+
             const currentTime = new Date();
-            const sendingTxs = transactions.filter(tx =>
-                tx.status === 'pending' && new Date(tx.scheduledAt) <= currentTime
-            );
+            // Poll if any transaction is NOT in a terminal state AND (it's already processing OR its time has come)
+            const activeTxs = transactionsRef.current.filter(tx => {
+                const isTerminal = ['success', 'failed', 'cancelled'].includes(tx.status);
+                const isDue = new Date(tx.scheduledAt) <= currentTime;
+                // If not terminal and (either it's past its time or it's already in a special state like 'processing')
+                return !isTerminal && (tx.status !== 'pending' || isDue);
+            });
 
-            if (sendingTxs.length === 0) return;
+            if (activeTxs.length === 0) return;
 
-            // Poll independently for each "Sending" transaction
-            await Promise.all(sendingTxs.map(async (tx) => {
-                try {
-                    const data = await getScheduledTransactionById(tx._id);
-                    if (data.scheduledTransactions && data.scheduledTransactions.length > 0) {
-                        // Find the exact transaction in the response to be safe
-                        const updatedTx = data.scheduledTransactions.find(t => t._id === tx._id);
-                        if (updatedTx && updatedTx.status !== 'pending') {
-                            // Status changed! Update local state
-                            setTransactions(prev => prev.map(t =>
-                                t._id === tx._id ? updatedTx : t
-                            ));
-                            // Refresh balance if it succeeded
-                            if (updatedTx.status === 'success' && user?.smartAccountId) {
-                                fetchBalance(user.smartAccountId);
-                            }
-                        }
-                    }
-                } catch (err) {
-                    console.error("Polling error for", tx._id, err);
-                }
-            }));
+            // Use silent refresh to update the list without showing loaders
+            fetchTransactions(user.smartAccountId, page, filterStatus, true);
         };
 
-        // Run once immediately
-        checkSendingTransactions();
+        // Run once immediately if there are active transactions
+        checkTransactions();
 
-        const pollTimer = setInterval(checkSendingTransactions, 5000); // Poll every 5s
+        const pollTimer = setInterval(checkTransactions, 10000); // Poll every 10s as requested
         return () => clearInterval(pollTimer);
-    }, [transactions, user?.smartAccountId]);
+    }, [user?.smartAccountId, page, filterStatus]); // Stable interval relative to filters/user
 
     // Load user on mount
     useEffect(() => {
@@ -106,11 +96,11 @@ export default function ScheduledTransactionsPage() {
         }
     };
 
-    const pendingCount = transactions.filter(tx => tx.status === 'pending').length;
+    const activeCount = transactions.filter(tx => !['success', 'failed', 'cancelled'].includes(tx.status)).length;
 
-    const fetchTransactions = async (smartAccountId, targetPage = 1, targetStatus = 'all') => {
+    const fetchTransactions = async (smartAccountId, targetPage = 1, targetStatus = 'all', isSilent = false) => {
         if (!smartAccountId) return;
-        setIsLoading(true);
+        if (!isSilent) setIsLoading(true);
         try {
             const params = {
                 userId: smartAccountId,
@@ -122,21 +112,28 @@ export default function ScheduledTransactionsPage() {
             }
             const data = await getScheduledTransactions(params);
             if (data.scheduledTransactions) {
-                // Backend returns sorted by scheduledAt 1 or -1 usually. 
-                // We keep newest first for the log.
                 const sorted = data.scheduledTransactions.sort((a, b) =>
                     new Date(b.scheduledAt) - new Date(a.scheduledAt)
                 );
+
+                // Only update if there's an actual change to avoid unnecessary re-renders
+                // (Though React handles this mostly, deep comparison would be better, but simple ref update is fine)
                 setTransactions(sorted);
+
                 if (data.pagination) {
                     setPage(data.pagination.page);
                     setTotalPages(data.pagination.totalPages);
                 }
+
+                // If any transaction just finished successfully, refresh balance
+                const hasNewSuccess = sorted.some(tx => tx.status === 'success') &&
+                    !transactionsRef.current.some(tx => tx.status === 'success');
+                if (hasNewSuccess) fetchBalance(smartAccountId);
             }
         } catch (error) {
             console.error("Failed to fetch scheduled transactions:", error);
         } finally {
-            setIsLoading(false);
+            if (!isSilent) setIsLoading(false);
         }
     };
 
@@ -160,7 +157,7 @@ export default function ScheduledTransactionsPage() {
             return;
         }
 
-        if (pendingCount > 0) {
+        if (activeCount > 0) {
             alert("You cannot add a new autopay transaction until your last one is completed (Success, Failed, or Cancelled).");
             setIsSubmitting(false);
             return;
@@ -351,7 +348,7 @@ export default function ScheduledTransactionsPage() {
                         </div>
                         <div>
                             <p className="text-xs text-gray-500 font-bold uppercase tracking-wider">Pending</p>
-                            <p className="text-2xl font-black text-[#1A1A2E]">{pendingCount}</p>
+                            <p className="text-2xl font-black text-[#1A1A2E]">{activeCount}</p>
                         </div>
                     </div>
                 </div>
@@ -374,7 +371,7 @@ export default function ScheduledTransactionsPage() {
                                 </div>
                             ) : (
                                 <form onSubmit={handleCreate} className="space-y-5">
-                                    {pendingCount > 0 && (
+                                    {activeCount > 0 && (
                                         <div className="bg-amber-50 border border-amber-100 rounded-xl p-4 mb-4">
                                             <div className="flex gap-3">
                                                 <svg className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -391,7 +388,7 @@ export default function ScheduledTransactionsPage() {
                                         <input
                                             type="text"
                                             required
-                                            disabled={pendingCount > 0}
+                                            disabled={activeCount > 0}
                                             value={recipient}
                                             onChange={(e) => setRecipient(e.target.value)}
                                             placeholder="G..."
@@ -405,7 +402,7 @@ export default function ScheduledTransactionsPage() {
                                             type="number"
                                             step="0.01"
                                             required
-                                            disabled={pendingCount > 0}
+                                            disabled={activeCount > 0}
                                             value={amount}
                                             onChange={(e) => setAmount(e.target.value)}
                                             placeholder="0.00"
@@ -424,7 +421,7 @@ export default function ScheduledTransactionsPage() {
                                         <input
                                             type="datetime-local"
                                             required
-                                            disabled={pendingCount > 0}
+                                            disabled={activeCount > 0}
                                             min={new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16)}
                                             value={scheduledDate}
                                             onChange={(e) => setScheduledDate(e.target.value)}
@@ -437,10 +434,10 @@ export default function ScheduledTransactionsPage() {
 
                                     <button
                                         type="submit"
-                                        disabled={isSubmitting || pendingCount > 0}
+                                        disabled={isSubmitting || activeCount > 0}
                                         className="w-full py-4 bg-[#1A1A2E] text-white rounded-xl font-bold shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/40 hover:-translate-y-0.5 transition-all disabled:opacity-70 disabled:cursor-not-allowed cursor-pointer"
                                     >
-                                        {isSubmitting ? 'Signing...' : (pendingCount > 0 ? 'Pending Request Active' : 'Schedule Payment')}
+                                        {isSubmitting ? 'Signing...' : (activeCount > 0 ? 'Pending Request Active' : 'Schedule Payment')}
                                     </button>
                                 </form>
                             )}

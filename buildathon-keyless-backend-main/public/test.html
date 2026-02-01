@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Passkey Smart Account</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            color: #e0e0e0;
+            padding: 20px;
+        }
+        .container { max-width: 600px; margin: 0 auto; }
+        h1 { text-align: center; color: #00d4ff; margin-bottom: 30px; }
+        .card {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 20px;
+        }
+        .card h2 { color: #00d4ff; margin-bottom: 16px; }
+        button {
+            padding: 14px 28px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            cursor: pointer;
+            font-weight: 600;
+            width: 100%;
+            margin-top: 10px;
+        }
+        .btn-primary { background: linear-gradient(135deg, #00d4ff, #0099cc); color: #000; }
+        .btn-secondary { background: rgba(255, 255, 255, 0.1); color: #00d4ff; border: 1px solid #00d4ff; }
+        .status {
+            margin-top: 16px;
+            padding: 12px;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 0.85rem;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+        .status.success { background: rgba(0, 255, 136, 0.1); border: 1px solid rgba(0, 255, 136, 0.3); color: #00ff88; }
+        .status.error { background: rgba(255, 71, 87, 0.1); border: 1px solid rgba(255, 71, 87, 0.3); color: #ff4757; }
+        .status.info { background: rgba(0, 212, 255, 0.1); border: 1px solid rgba(0, 212, 255, 0.3); color: #00d4ff; }
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Passkey Test</h1>
+
+        <div class="card">
+            <h2>Test WebAuthn Registration</h2>
+            <button onclick="testRegister()" class="btn-primary">Test Register</button>
+            <div id="status" class="status hidden"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'http://localhost:3000';
+
+        function showStatus(msg, type) {
+            const el = document.getElementById('status');
+            el.classList.remove('hidden', 'success', 'error', 'info');
+            el.classList.add(type);
+            el.textContent = typeof msg === 'object' ? JSON.stringify(msg, null, 2) : msg;
+        }
+
+        function base64urlToBuffer(base64url) {
+            const base64 = base64url.replace(/-/g, '+').replace(/_/g, '/');
+            const padded = base64 + '='.repeat((4 - base64.length % 4) % 4);
+            const binary = atob(padded);
+            const bytes = new Uint8Array(binary.length);
+            for (let i = 0; i < binary.length; i++) {
+                bytes[i] = binary.charCodeAt(i);
+            }
+            return bytes.buffer;
+        }
+
+        function bufferToBase64url(buffer) {
+            const bytes = new Uint8Array(buffer);
+            let binary = '';
+            for (let i = 0; i < bytes.length; i++) {
+                binary += String.fromCharCode(bytes[i]);
+            }
+            return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+        }
+
+        async function testRegister() {
+            try {
+                showStatus('Getting challenge from server...', 'info');
+
+                const res = await fetch(`${API_URL}/register-challenge`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                const { options } = await res.json();
+
+                console.log('Server options:', options);
+
+                // Convert challenge to ArrayBuffer
+                const publicKeyOptions = {
+                    challenge: base64urlToBuffer(options.challenge),
+                    rp: options.rp,
+                    user: {
+                        id: base64urlToBuffer(options.user.id),
+                        name: options.user.name,
+                        displayName: options.user.displayName
+                    },
+                    pubKeyCredParams: options.pubKeyCredParams,
+                    timeout: options.timeout,
+                    attestation: options.attestation,
+                    authenticatorSelection: options.authenticatorSelection
+                };
+
+                console.log('Converted options:', publicKeyOptions);
+
+                showStatus('Please authenticate with your device...', 'info');
+
+                const credential = await navigator.credentials.create({
+                    publicKey: publicKeyOptions
+                });
+
+                console.log('Credential created:', credential);
+
+                // Convert credential response for server
+                const credentialForServer = {
+                    id: credential.id,
+                    rawId: bufferToBase64url(credential.rawId),
+                    response: {
+                        attestationObject: bufferToBase64url(credential.response.attestationObject),
+                        clientDataJSON: bufferToBase64url(credential.response.clientDataJSON)
+                    },
+                    type: credential.type
+                };
+
+                showStatus('Verifying with server...', 'info');
+
+                const verifyRes = await fetch(`${API_URL}/register-verify`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ cred: credentialForServer })
+                });
+                const result = await verifyRes.json();
+
+                if (result.verified) {
+                    showStatus(`Success! User ID: ${result.userId}`, 'success');
+                } else {
+                    showStatus(`Error: ${result.error || 'Verification failed'}`, 'error');
+                }
+            } catch (err) {
+                console.error('Error:', err);
+                showStatus(`Error: ${err.message}`, 'error');
+            }
+        }
+    </script>
+</body>
+</html>

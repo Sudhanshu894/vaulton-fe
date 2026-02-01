@@ -56,8 +56,8 @@ export default function About() {
                                     <p className="text-sm text-gray-500">Biometric-first authentication</p>
                                 </div>
                                 <div className="p-4 border-l-4 border-[#1A1A2E] bg-white shadow-sm rounded-r-xl">
-                                    <h4 className="font-bold text-[#1A1A2E]">Seamless</h4>
-                                    <p className="text-sm text-gray-500">One-click checkout flow</p>
+                                    <h4 className="font-bold text-[#1A1A2E]">Gasless Transaction</h4>
+                                    <p className="text-sm text-gray-500">Zero gas fees for any transactions on-chain</p>
                                 </div>
                             </div>
                         </div>

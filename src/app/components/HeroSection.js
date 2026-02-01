@@ -85,7 +85,7 @@ export default function HeroSection() {
     };
 
     return (
-        <main className="relative pt-20 md:pt-0 px-6 lg:px-12 flex items-center justify-center h-screen min-h-[700px] md:min-h-0 overflow-hidden bg-[#FAFAFA]">
+        <main className="relative pb-20 pt-28 md:pt-30 md:pb-20 px-6 lg:px-12 flex items-center justify-center min-h-screen w-full overflow-x-hidden bg-[#FAFAFA]">
             {/* Interactive Background */}
             <Particles />
 
@@ -109,10 +109,10 @@ export default function HeroSection() {
                             initial={{ opacity: 0, x: -30 }}
                             animate={{ opacity: 1, x: 0 }}
                             transition={{ duration: 0.8 }}
-                            className="space-y-4 lg:space-y-6"
+                            className="space-y-8 md:space-y-10"
                         >
                             <span className="px-4 py-2 rounded-full bg-[#1A1A2E]/5 text-[#1A1A2E] text-[10px] lg:text-sm font-bold tracking-widest uppercase border border-[#1A1A2E]/10">
-                                Better Security • Better Shopping
+                                Better Security • Better Experience
                             </span>
                             <h1 className="text-5xl md:text-6xl lg:text-8xl font-black text-transparent bg-clip-text bg-gradient-to-r from-[#4B5563] via-[#E5E7EB] via-70% to-[#FFB800] leading-[0.9] tracking-tighter">
                                 VAULTON.

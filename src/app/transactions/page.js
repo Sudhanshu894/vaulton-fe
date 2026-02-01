@@ -82,7 +82,7 @@ export default function TransactionsPage() {
         // Polling loop to detect user changes if Navbar updates local storage without page reload
         // Or just basic hydration.
         const checkUser = () => {
-            const savedUser = localStorage.getItem('vaulton_user');
+            const savedUser = sessionStorage.getItem('vaulton_user');
             if (savedUser) {
                 const parsed = JSON.parse(savedUser);
                 if (!user || user.userId !== parsed.userId) {

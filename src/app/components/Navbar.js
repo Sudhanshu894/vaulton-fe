@@ -31,7 +31,7 @@ export default function Navbar() {
 
     useEffect(() => {
         // Load state from local storage on mount
-        const savedUser = localStorage.getItem('vaulton_user');
+        const savedUser = sessionStorage.getItem('vaulton_user');
         if (savedUser) {
             const parsedUser = JSON.parse(savedUser);
             setUser(parsedUser);
@@ -138,7 +138,7 @@ export default function Navbar() {
                 };
 
                 setUser(newUser);
-                localStorage.setItem('vaulton_user', JSON.stringify(newUser));
+                sessionStorage.setItem('vaulton_user', JSON.stringify(newUser));
 
                 if (smartAccountId) {
                     fetchBalance(smartAccountId);
@@ -176,7 +176,7 @@ export default function Navbar() {
                 };
 
                 setUser(loggedInUser);
-                localStorage.setItem('vaulton_user', JSON.stringify(loggedInUser));
+                sessionStorage.setItem('vaulton_user', JSON.stringify(loggedInUser));
 
                 if (loggedInUser.smartAccountId) {
                     fetchBalance(loggedInUser.smartAccountId);
@@ -195,7 +195,7 @@ export default function Navbar() {
     const handleLogout = () => {
         setUser(null);
         setBalance(null);
-        localStorage.removeItem('vaulton_user');
+        sessionStorage.removeItem('vaulton_user');
         setIsDropdownOpen(false);
     };
 

@@ -29,7 +29,7 @@ export default function Support() {
     });
 
     useEffect(() => {
-        const savedUser = localStorage.getItem('vaulton_user');
+        const savedUser = sessionStorage.getItem('vaulton_user');
         if (savedUser) {
             const parsedUser = JSON.parse(savedUser);
             setUser(parsedUser);

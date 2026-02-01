@@ -30,6 +30,8 @@ export default function ScheduledTransactionsPage() {
     const [transactions, setTransactions] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
     const [filterStatus, setFilterStatus] = useState('all');
+    const [page, setPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
     // Refs for stable polling and request tracking
     const transactionsRef = useRef(transactions);
     useEffect(() => { transactionsRef.current = transactions; }, [transactions]);

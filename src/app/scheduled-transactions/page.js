@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { startAuthentication } from '@simplewebauthn/browser';
 import Navbar from '../components/Navbar';
@@ -30,21 +30,35 @@ export default function ScheduledTransactionsPage() {
     const [transactions, setTransactions] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
     const [filterStatus, setFilterStatus] = useState('all');
-    const [page, setPage] = useState(1);
-    const [totalPages, setTotalPages] = useState(1);
-
-    // Refs for stable polling
-    const transactionsRef = { current: transactions };
+    // Refs for stable polling and request tracking
+    const transactionsRef = useRef(transactions);
     useEffect(() => { transactionsRef.current = transactions; }, [transactions]);
+    const refreshingRef = useRef(false);
 
     // Timer state for countdowns
     const [now, setNow] = useState(new Date());
 
-    // Update timer every second
+    // Update timer every second and trigger immediate refresh when cooldown ends
     useEffect(() => {
-        const timer = setInterval(() => setNow(new Date()), 1000);
+        const timer = setInterval(() => {
+            const nextNow = new Date();
+            setNow(nextNow);
+
+            // Trigger immediate refresh when a "pending" transaction's cooldown ends
+            if (user?.smartAccountId && !refreshingRef.current) {
+                const hasDue = transactionsRef.current.some(tx =>
+                    tx.status === 'pending' && new Date(tx.scheduledAt) <= nextNow
+                );
+
+                if (hasDue) {
+                    refreshingRef.current = true;
+                    fetchTransactions(user.smartAccountId, page, filterStatus, true)
+                        .finally(() => { refreshingRef.current = false; });
+                }
+            }
+        }, 1000);
         return () => clearInterval(timer);
-    }, []);
+    }, [user?.smartAccountId, page, filterStatus]);
 
     // Polling for non-terminal transactions
     useEffect(() => {

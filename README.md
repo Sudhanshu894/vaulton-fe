@@ -2,7 +2,7 @@
 
 Vaulton is a premium, biometric-first keyless wallet designed to bridge the gap between traditional ease-of-use and blockchain security. By leveraging **Passkey** technology and **Account Abstraction on Stellar**, we eliminate the need for complex seed phrases, making crypto transactions as simple as a biometric scan.
 
-## 🚀 Project Overview
+## Project Overview
 Vaulton is a Web3 self-custody wallet that prioritizes user experience without compromising security. It allows users to onboard using their device's native biometrics (Face ID, Touch ID, or Windows Hello) to create a smart contract-based account on the Stellar network.
 
 ### What it Solves
@@ -14,7 +14,7 @@ Vaulton is a Web3 self-custody wallet that prioritizes user experience without c
 
 ---
 
-## 🛠 Tech Stack
+## Tech Stack
 - **Frontend**: [Next.js 16](https://nextjs.org/) (App Router), React 19.
 - **Styling & Animation**: [Tailwind CSS 4](https://tailwindcss.com/), [Framer Motion](https://www.framer.com/motion/).
 - **Authentication**: [WebAuthn / Passkeys](https://webauthn.guide/) via `@simplewebauthn/browser`.
@@ -24,7 +24,7 @@ Vaulton is a Web3 self-custody wallet that prioritizes user experience without c
 
 ---
 
-## ✨ Features & USPs
+## Features & USPs
 Vaulton is built on the principle of **"Biometric Citadel"**—security that is invisible yet impenetrable.
 
 ### 1. Biometric Citadel (Passkey Authentication)
@@ -42,7 +42,7 @@ Vaulton can be installed directly onto your mobile or desktop home screen as a P
 
 ---
 
-## 🔄 User Flow
+## User Flow
 1.  **Onboarding**: Click "Get Started" and perform a biometric scan to register a new Smart Account.
 2.  **Dashboard**: View your USDC balance and transaction history in a clean, minimalist interface.
 3.  **Transact**: Send USDC to any wallet address. The transaction is authorized via a biometric scan and relayed gaslessly.
@@ -51,7 +51,7 @@ Vaulton can be installed directly onto your mobile or desktop home screen as a P
 
 ---
 
-## 💻 Local Setup & Installation
+## Local Setup & Installation
 
 Follow these steps to run Vaulton on your local machine:
 
@@ -91,7 +91,7 @@ Follow these steps to run Vaulton on your local machine:
 
 ---
 
-## ❓ Q&A / FAQs
+## Q&A / FAQs
 
 **Q: Is Vaulton custodial?**
 **A:** No. Vaulton is a self-custody wallet. Your keys are generated and stored in your device's Secure Enclave/TPM via Passkeys. We never have access to your keys.
@@ -104,5 +104,5 @@ Follow these steps to run Vaulton on your local machine:
 
 ---
 
-## 🛡 Security & Reliability
+## Security & Reliability
 Vaulton is designed with a **Trust-Zero Architecture**. Every user interaction is cryptographically verified against the registered Passkey public key on-chain, ensuring that even if the UI or backend is compromised, your funds remain safe under your biometric control.

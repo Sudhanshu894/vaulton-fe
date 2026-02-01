@@ -2,7 +2,7 @@
 
 Vaulton is a biometric-first keyless wallet designed to bridge the gap between traditional ease-of-use and blockchain security. By leveraging **Passkey** technology and **Account Abstraction on Stellar**, we eliminate the need for complex seed phrases, making crypto transactions as simple as a biometric scan.
 
-**[Deployed Application](https://vaulton.dahiya.tech)** &nbsp; | &nbsp; **[Demo Video]([https://drive.google.com](https://drive.google.com/drive/folders/1eFbqI7CRDNlm7uSZzF6VR2g8OJ9Y4m5W?usp=sharing))**
+**[Deployed Application](https://vaulton.dahiya.tech)** &nbsp; | &nbsp; **[Demo Video]([https://drive.google.com/drive/folders/1eFbqI7CRDNlm7uSZzF6VR2g8OJ9Y4m5W?usp=sharing])**
 
 ## Project Overview
 Vaulton is a Web3 self-custody wallet that prioritizes user experience without compromising security. It allows users to onboard using their device's native biometrics (Face ID, Touch ID, or Windows Hello) to create a smart contract-based account on the Stellar network. It uniquely features an Autopay system for scheduled transactions that operates without the platform needing to control, manupulate, or access user-sensitive information, ensuring privacy-preserving automation.

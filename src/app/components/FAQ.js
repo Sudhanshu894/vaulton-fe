@@ -61,7 +61,7 @@ export default function FAQ() {
                         >
                             <button
                                 onClick={() => toggleAccordion(index)}
-                                className="w-full flex items-center justify-between p-6 text-left focus:outline-none group"
+                                className="w-full flex items-center justify-between p-6 text-left focus:outline-none group cursor-pointer"
                             >
                                 <span className={`text-lg sm:text-xl font-bold transition-colors duration-300 ${activeIndex === index ? "text-[#FFB800]" : "text-[#1A1A2E] group-hover:text-[#FFB800]"}`}>
                                     {faq.question}

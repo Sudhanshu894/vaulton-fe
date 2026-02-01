@@ -273,7 +273,7 @@ export default function HeroSection() {
                                         onClick={handleInstallClick}
                                         whileHover={{ scale: 1.02 }}
                                         whileTap={{ scale: 0.98 }}
-                                        className="group relative flex items-center gap-3 bg-[#1A1A2E] text-white px-8 py-4 lg:px-10 lg:py-4 rounded-2xl font-bold text-base shadow-xl overflow-hidden hover:shadow-2xl transition-all z-30"
+                                        className="group relative flex items-center gap-3 bg-[#1A1A2E] text-white px-8 py-4 lg:px-10 lg:py-4 rounded-2xl font-bold text-base shadow-xl overflow-hidden hover:shadow-2xl transition-all z-30 cursor-pointer"
                                     >
                                         <span className="relative z-10 flex items-center gap-3">
                                             <svg className="w-5 h-5 animate-bounce-slow" fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -254,14 +254,14 @@ export default function TransactionsPage() {
                     <div className="flex gap-4 mb-8 border-b border-gray-100">
                         <button
                             onClick={() => setActiveTab('send')}
-                            className={`pb-4 px-2 font-bold text-lg transition-colors relative ${activeTab === 'send' ? 'text-[#1A1A2E]' : 'text-gray-400 hover:text-gray-600'}`}
+                            className={`pb-4 px-2 font-bold text-lg transition-colors relative cursor-pointer ${activeTab === 'send' ? 'text-[#1A1A2E]' : 'text-gray-400 hover:text-gray-600'}`}
                         >
                             Send USDC
                             {activeTab === 'send' && <span className="absolute bottom-0 left-0 w-full h-1 bg-[#1A1A2E] rounded-t-full"></span>}
                         </button>
                         <button
                             onClick={() => setActiveTab('history')}
-                            className={`pb-4 px-2 font-bold text-lg transition-colors relative ${activeTab === 'history' ? 'text-[#1A1A2E]' : 'text-gray-400 hover:text-gray-600'}`}
+                            className={`pb-4 px-2 font-bold text-lg transition-colors relative cursor-pointer ${activeTab === 'history' ? 'text-[#1A1A2E]' : 'text-gray-400 hover:text-gray-600'}`}
                         >
                             History
                             {activeTab === 'history' && <span className="absolute bottom-0 left-0 w-full h-1 bg-[#1A1A2E] rounded-t-full"></span>}
@@ -372,7 +372,7 @@ export default function TransactionsPage() {
                                 <button
                                     type="submit"
                                     disabled={isLoading || !user}
-                                    className="w-full bg-[#1A1A2E] text-white py-4 rounded-xl font-bold text-lg hover:bg-[#2A2A4E] transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl active:scale-[0.99]"
+                                    className="w-full bg-[#1A1A2E] text-white py-4 rounded-xl font-bold text-lg hover:bg-[#2A2A4E] transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl active:scale-[0.99] cursor-pointer"
                                 >
                                     {isLoading ? 'Processing...' : 'Sign & Transfer'}
                                 </button>
@@ -388,7 +388,7 @@ export default function TransactionsPage() {
                                     <p className="text-gray-500">Your recent transaction activity.</p>
                                     <button
                                         onClick={() => user?.smartAccountId && fetchHistory(user.smartAccountId, page)}
-                                        className="p-2 hover:bg-gray-100 rounded-lg transition-colors text-gray-600 hover:text-[#1A1A2E]"
+                                        className="p-2 hover:bg-gray-100 rounded-lg transition-colors text-gray-600 hover:text-[#1A1A2E] cursor-pointer"
                                         title="Refresh"
                                         disabled={loadingHistory}
                                     >
@@ -397,8 +397,8 @@ export default function TransactionsPage() {
                                             fill="none"
                                             stroke="currentColor"
                                             viewBox="0 0 24 24"
-                                            animate={loadingHistory ? { rotate: 360 } : { rotate: 0 }}
-                                            transition={loadingHistory ? { duration: 1, repeat: Infinity, ease: "linear" } : { duration: 0.5, ease: "easeOut" }}
+                                            animate={loadingHistory ? { rotate: 720 } : { rotate: 0 }}
+                                            transition={{ duration: 0.8, ease: "easeInOut" }}
                                         >
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                                         </motion.svg>

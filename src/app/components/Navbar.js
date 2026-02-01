@@ -221,7 +221,7 @@ export default function Navbar() {
                             <button
                                 key={link.name}
                                 onClick={() => handleLinkClick(link.href)}
-                                className="relative text-gray-600 hover:text-[#1A1A2E] font-medium transition-colors duration-300 group"
+                                className="relative text-gray-600 hover:text-[#1A1A2E] font-medium transition-colors duration-300 group cursor-pointer"
                             >
                                 {link.name}
                                 <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-[#1A1A2E] group-hover:w-full transition-all duration-300"></span>
@@ -235,7 +235,7 @@ export default function Navbar() {
                             <div className="relative">
                                 <button
                                     onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                                    className="flex items-center gap-2 px-4 py-2 rounded-full border border-gray-200 hover:bg-gray-50 transition-all font-semibold"
+                                    className="flex items-center gap-2 px-4 py-2 rounded-full border border-gray-200 hover:bg-gray-50 transition-all font-semibold cursor-pointer"
                                 >
                                     <span className="w-2 h-2 rounded-full bg-green-500"></span>
                                     {user.name || user.userId.substring(0, 12)}...
@@ -266,7 +266,7 @@ export default function Navbar() {
                                                                     e.stopPropagation();
                                                                     navigator.clipboard.writeText(user.smartAccountId);
                                                                 }}
-                                                                className="text-gray-400 hover:text-[#1A1A2E] transition-colors"
+                                                                className="text-gray-400 hover:text-[#1A1A2E] transition-colors cursor-pointer"
                                                                 title="Copy Address"
                                                             >
                                                                 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -288,7 +288,7 @@ export default function Navbar() {
                                                                 e.stopPropagation();
                                                                 if (user.smartAccountId) fetchBalance(user.smartAccountId);
                                                             }}
-                                                            className="p-1.5 hover:bg-gray-200 rounded-full transition-colors"
+                                                            className="p-1.5 hover:bg-gray-200 rounded-full transition-colors cursor-pointer"
                                                             title="Refresh Balance"
                                                             disabled={isRefreshingBalance}
                                                         >
@@ -297,8 +297,8 @@ export default function Navbar() {
                                                                 fill="none"
                                                                 stroke="currentColor"
                                                                 viewBox="0 0 24 24"
-                                                                animate={isRefreshingBalance ? { rotate: 360 } : { rotate: 0 }}
-                                                                transition={isRefreshingBalance ? { duration: 1, repeat: Infinity, ease: "linear" } : { duration: 0.5, ease: "easeOut" }}
+                                                                animate={isRefreshingBalance ? { rotate: 720 } : { rotate: 0 }}
+                                                                transition={{ duration: 0.8, ease: "easeInOut" }}
                                                             >
                                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                                                             </motion.svg>
@@ -375,7 +375,7 @@ export default function Navbar() {
                                     <button
                                         key={link.name}
                                         onClick={() => handleLinkClick(link.href)}
-                                        className="text-left text-lg text-gray-600 hover:text-[#1A1A2E] font-medium transition-colors duration-300"
+                                        className="text-left text-lg text-gray-600 hover:text-[#1A1A2E] font-medium transition-colors duration-300 cursor-pointer"
                                     >
                                         {link.name}
                                     </button>
@@ -396,7 +396,7 @@ export default function Navbar() {
                                             </div>
                                             <button
                                                 onClick={handleLogout}
-                                                className="text-left text-red-500 font-medium"
+                                                className="text-left text-red-500 font-medium cursor-pointer"
                                             >
                                                 Logout
                                             </button>
@@ -405,13 +405,13 @@ export default function Navbar() {
                                         <>
                                             <button
                                                 onClick={() => { handleLogin(); toggleMenu(); }}
-                                                className="text-left text-[#1A1A2E] font-medium"
+                                                className="text-left text-[#1A1A2E] font-medium cursor-pointer"
                                             >
                                                 Smart Account?
                                             </button>
                                             <button
                                                 onClick={() => { handleRegister(); toggleMenu(); }}
-                                                className="w-full py-3 bg-gradient-to-r from-[#1A1A2E] to-[#2A2A4E] text-white rounded-xl font-semibold shadow-md active:scale-95 transition-transform"
+                                                className="w-full py-3 bg-gradient-to-r from-[#1A1A2E] to-[#2A2A4E] text-white rounded-xl font-semibold shadow-md active:scale-95 transition-transform cursor-pointer"
                                             >
                                                 Create one!
                                             </button>

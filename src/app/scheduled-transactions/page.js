@@ -406,7 +406,7 @@ export default function ScheduledTransactionsPage() {
                                     <button
                                         type="submit"
                                         disabled={isSubmitting}
-                                        className="w-full py-4 bg-[#1A1A2E] text-white rounded-xl font-bold shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/40 hover:-translate-y-0.5 transition-all disabled:opacity-70 disabled:cursor-not-allowed"
+                                        className="w-full py-4 bg-[#1A1A2E] text-white rounded-xl font-bold shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/40 hover:-translate-y-0.5 transition-all disabled:opacity-70 disabled:cursor-not-allowed cursor-pointer"
                                     >
                                         {isSubmitting ? 'Signing...' : 'Schedule Payment'}
                                     </button>
@@ -425,7 +425,7 @@ export default function ScheduledTransactionsPage() {
                                     <button
                                         key={status}
                                         onClick={() => handleFilterChange(status)}
-                                        className={`px-5 py-2 rounded-full text-sm font-bold capitalize whitespace-nowrap transition-all ${filterStatus === status
+                                        className={`px-5 py-2 rounded-full text-sm font-bold capitalize whitespace-nowrap transition-all cursor-pointer ${filterStatus === status
                                             ? 'bg-[#1A1A2E] text-white shadow-lg'
                                             : 'bg-white text-gray-500 hover:bg-gray-50 border border-gray-100'
                                             }`}
@@ -436,7 +436,7 @@ export default function ScheduledTransactionsPage() {
                             </div>
                             <button
                                 onClick={() => user?.smartAccountId && fetchTransactions(user.smartAccountId, page, filterStatus)}
-                                className="p-2 hover:bg-gray-100 rounded-lg transition-colors text-gray-400 hover:text-[#1A1A2E] shrink-0"
+                                className="p-2 hover:bg-gray-100 rounded-lg transition-colors text-gray-400 hover:text-[#1A1A2E] shrink-0 cursor-pointer"
                                 disabled={isLoading}
                                 title="Refresh Schedules"
                             >
@@ -445,8 +445,8 @@ export default function ScheduledTransactionsPage() {
                                     fill="none"
                                     stroke="currentColor"
                                     viewBox="0 0 24 24"
-                                    animate={isLoading ? { rotate: 360 } : { rotate: 0 }}
-                                    transition={isLoading ? { duration: 1, repeat: Infinity, ease: "linear" } : { duration: 0.5, ease: "easeOut" }}
+                                    animate={isLoading ? { rotate: 720 } : { rotate: 0 }}
+                                    transition={{ duration: 0.8, ease: "easeInOut" }}
                                 >
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                                 </motion.svg>
@@ -568,7 +568,7 @@ export default function ScheduledTransactionsPage() {
                                                         {tx.status === 'pending' && (
                                                             <button
                                                                 onClick={() => handleCancel(tx._id)}
-                                                                className="text-gray-400 hover:text-red-500 transition-colors p-2 hover:bg-red-50 rounded-lg group-hover:opacity-100 md:opacity-0 transition-opacity"
+                                                                className="text-gray-400 hover:text-red-500 transition-colors p-2 hover:bg-red-50 rounded-lg group-hover:opacity-100 md:opacity-0 transition-opacity cursor-pointer"
                                                                 title="Cancel Schedule"
                                                             >
                                                                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

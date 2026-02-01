@@ -165,7 +165,7 @@ export default function Support() {
                         <div className="bg-white rounded-full p-1.5 shadow-lg inline-flex gap-2">
                             <motion.button
                                 onClick={() => setActiveTab("query")}
-                                className={`px-8 py-2.5 rounded-full font-semibold transition-all ${activeTab === "query"
+                                className={`px-8 py-2.5 rounded-full font-semibold transition-all cursor-pointer ${activeTab === "query"
                                     ? "bg-[#1A1A2E] text-white"
                                     : "text-gray-600 hover:text-[#1A1A2E]"
                                     }`}
@@ -176,7 +176,7 @@ export default function Support() {
                             </motion.button>
                             <motion.button
                                 onClick={() => setActiveTab("feedback")}
-                                className={`px-8 py-2.5 rounded-full font-semibold transition-all ${activeTab === "feedback"
+                                className={`px-8 py-2.5 rounded-full font-semibold transition-all cursor-pointer ${activeTab === "feedback"
                                     ? "bg-[#1A1A2E] text-white"
                                     : "text-gray-600 hover:text-[#1A1A2E]"
                                     }`}
@@ -300,7 +300,7 @@ export default function Support() {
                                         <motion.button
                                             type="submit"
                                             disabled={isSubmitting}
-                                            className="w-full bg-gradient-to-r from-[#1A1A2E] to-[#2A2A3E] text-white py-3.5 rounded-xl font-bold text-lg shadow-lg hover:shadow-xl disabled:opacity-50"
+                                            className="w-full bg-gradient-to-r from-[#1A1A2E] to-[#2A2A3E] text-white py-3.5 rounded-xl font-bold text-lg shadow-lg hover:shadow-xl disabled:opacity-50 cursor-pointer"
                                             whileHover={{
                                                 scale: 1.02,
                                                 boxShadow: "0 20px 40px rgba(26, 26, 46, 0.3)",
@@ -398,7 +398,7 @@ export default function Support() {
                                         <motion.button
                                             type="submit"
                                             disabled={isSubmitting}
-                                            className="w-full bg-gradient-to-r from-[#FFB800] to-[#FFA000] text-[#1A1A2E] py-3.5 rounded-xl font-bold text-lg shadow-lg hover:shadow-xl disabled:opacity-50"
+                                            className="w-full bg-gradient-to-r from-[#FFB800] to-[#FFA000] text-[#1A1A2E] py-3.5 rounded-xl font-bold text-lg shadow-lg hover:shadow-xl disabled:opacity-50 cursor-pointer"
                                             whileHover={{
                                                 scale: 1.02,
                                                 boxShadow: "0 20px 40px rgba(255, 184, 0, 0.4)",
@@ -429,7 +429,7 @@ export default function Support() {
                             <h2 className="text-2xl font-bold text-[#1A1A2E]">Opened Tickets</h2>
                             <button
                                 onClick={() => user?.smartAccountId && fetchTickets(user.smartAccountId, page)}
-                                className="p-2 hover:bg-gray-100 rounded-lg transition-colors text-gray-400 hover:text-[#1A1A2E]"
+                                className="p-2 hover:bg-gray-100 rounded-lg transition-colors text-gray-400 hover:text-[#1A1A2E] cursor-pointer"
                                 disabled={isLoading}
                                 title="Refresh Tickets"
                             >
@@ -438,8 +438,8 @@ export default function Support() {
                                     fill="none"
                                     stroke="currentColor"
                                     viewBox="0 0 24 24"
-                                    animate={isLoading ? { rotate: 360 } : { rotate: 0 }}
-                                    transition={isLoading ? { duration: 1, repeat: Infinity, ease: "linear" } : { duration: 0.5, ease: "easeOut" }}
+                                    animate={isLoading ? { rotate: 720 } : { rotate: 0 }}
+                                    transition={{ duration: 0.8, ease: "easeInOut" }}
                                 >
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                                 </motion.svg>

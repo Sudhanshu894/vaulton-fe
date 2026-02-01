@@ -149,3 +149,43 @@ export const getSupportTickets = async (walletAddress, page = 1, limit = 5) => {
         throw error;
     }
 };
+
+export const createScheduledTransaction = async (txData) => {
+    try {
+        const response = await api.post('/scheduled-transactions', txData);
+        return response.data;
+    } catch (error) {
+        console.error("Create scheduled transaction failed:", error);
+        throw error;
+    }
+};
+
+export const getScheduledTransactions = async (params) => {
+    try {
+        const response = await api.get('/scheduled-transactions', { params });
+        return response.data;
+    } catch (error) {
+        console.error("Get scheduled transactions failed:", error);
+        throw error;
+    }
+};
+
+export const cancelScheduledTransaction = async (txId) => {
+    try {
+        const response = await api.patch(`/scheduled-transactions/${txId}/cancel`);
+        return response.data;
+    } catch (error) {
+        console.error("Cancel scheduled transaction failed:", error);
+        throw error;
+    }
+};
+
+export const getScheduledTransactionById = async (id) => {
+    try {
+        const response = await api.get(`/scheduled-transactions`, { params: { id } });
+        return response.data;
+    } catch (error) {
+        console.error("Get scheduled transaction by ID failed:", error);
+        throw error;
+    }
+};

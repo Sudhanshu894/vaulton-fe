@@ -50,7 +50,7 @@ export default function About() {
                             <p className="text-lg sm:text-xl text-gray-600 font-light leading-relaxed mb-8">
                                 Vaulton is the ultimate keyless wallet designed to bridge the gap between traditional ease-of-use and blockchain security. By leveraging Passkey technology, we eliminate the need for complex seed phrases, making crypto transactions as simple as a biometric scan.
                             </p>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-8">
+                            {/* <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-8">
                                 <div className="p-4 border-l-4 border-[#FFB800] bg-white shadow-sm rounded-r-xl">
                                     <h4 className="font-bold text-[#1A1A2E]">Secure</h4>
                                     <p className="text-sm text-gray-500">Biometric-first authentication</p>
@@ -59,7 +59,7 @@ export default function About() {
                                     <h4 className="font-bold text-[#1A1A2E]">Gasless Transaction</h4>
                                     <p className="text-sm text-gray-500">Zero gas fees for any transactions on-chain</p>
                                 </div>
-                            </div>
+                            </div> */}
                         </div>
                         <div className="relative mt-12 lg:mt-0">
                             <motion.div
@@ -77,6 +77,92 @@ export default function About() {
                             </motion.div>
                             <div className="absolute -bottom-6 -right-6 w-32 h-32 bg-[#FFB800]/10 rounded-full blur-2xl"></div>
                         </div>
+                    </div>
+                </motion.div>
+
+                {/* Main Features & USPs - Custom Premium Design */}
+                <motion.div
+                    initial={{ opacity: 0 }}
+                    whileInView={{ opacity: 1 }}
+                    viewport={{ once: true }}
+                    className="mb-32 relative"
+                >
+                    {/* Decorative background blur */}
+                    <div className="absolute -top-24 -right-24 w-96 h-96 bg-indigo-500/10 rounded-full blur-[120px] pointer-events-none"></div>
+
+                    <div className="text-center mb-20">
+                        <motion.span
+                            initial={{ opacity: 0, y: 10 }}
+                            whileInView={{ opacity: 1, y: 0 }}
+                            className="text-[#FFB800] font-black tracking-[0.2em] uppercase text-sm mb-4 block"
+                        >
+                            The Vaulton Edge
+                        </motion.span>
+                        <h3 className="text-4xl md:text-6xl font-black text-[#1A1A2E] tracking-tight">
+                            Main Features <span className="text-gray-300">&</span> USPs
+                        </h3>
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
+                        {/* Card 1: Passkey */}
+                        <motion.div
+                            whileHover={{ y: -12 }}
+                            className="group relative bg-[#1A1A2E] p-10 rounded-[3rem] overflow-hidden shadow-2xl shadow-indigo-900/20"
+                        >
+                            <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-bl-full transition-all group-hover:bg-white/10"></div>
+                            <div className="relative z-10">
+                                <div className="mb-8 p-4 bg-white/10 w-fit rounded-2xl backdrop-blur-md border border-white/10 text-[#FFB800]">
+                                    <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 00-2 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                    </svg>
+                                </div>
+                                <h4 className="text-2xl font-bold text-white mb-6">Biometric <br />Citadel</h4>
+                                <p className="text-gray-400 font-light leading-relaxed">
+                                    Your biometrics are the only key. Powered by hardware-level secure enclaves, we've eliminated seed phrase vulnerability forever.
+                                </p>
+                            </div>
+                            <div className="absolute bottom-6 right-10 text-white/5 text-8:xl font-black italic select-none">01</div>
+                        </motion.div>
+
+                        {/* Card 2: Gasless */}
+                        <motion.div
+                            whileHover={{ y: -12 }}
+                            className="group relative bg-white p-10 rounded-[3rem] border border-gray-100 shadow-xl"
+                        >
+                            <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-50 rounded-bl-full transition-all group-hover:bg-indigo-100/50"></div>
+                            <div className="relative z-10">
+                                <div className="mb-8 p-4 bg-indigo-50 w-fit rounded-2xl text-indigo-600">
+                                    <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                                    </svg>
+                                </div>
+                                <h4 className="text-2xl font-bold text-[#1A1A2E] mb-6">The Gasless <br />Protocol</h4>
+                                <p className="text-gray-600 font-light leading-relaxed">
+                                    Forget XLM balances. Every transaction is fuel-free for the user, powered by our high-performance paymaster infrastructure.
+                                </p>
+                            </div>
+                            <div className="absolute bottom-6 right-10 text-gray-50 text-8xl font-black italic select-none">02</div>
+                        </motion.div>
+
+                        {/* Card 3: Autopay */}
+                        <motion.div
+                            whileHover={{ y: -12 }}
+                            className="group relative bg-gradient-to-br from-[#FFB800] to-[#E6A600] p-10 rounded-[3rem] shadow-2xl shadow-[#FFB800]/20"
+                        >
+                            <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-bl-full"></div>
+                            <div className="relative z-10">
+                                <div className="mb-8 p-4 bg-white/20 w-fit rounded-2xl backdrop-blur-lg border border-white/20 text-[#1A1A2E]">
+                                    <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                                    </svg>
+                                </div>
+                                <h4 className="text-2xl font-bold text-[#1A1A2E] mb-6">Immutable <br />Autopay</h4>
+                                <p className="text-[#1A1A2E]/80 font-medium leading-relaxed">
+                                    A protocol-level commitment. We cannot temper transactions once scheduled—ensuring absolute reliability and trust in every payment.
+                                </p>
+                            </div>
+                            <div className="absolute bottom-6 right-10 text-white/20 text-8xl font-black italic select-none">03</div>
+                        </motion.div>
                     </div>
                 </motion.div>
 

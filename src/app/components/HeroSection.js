@@ -36,6 +36,16 @@ const features = [
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
             </svg>
         )
+    },
+    {
+        title: "Gasless Experience",
+        description: "Zero fees for users, automated cover.",
+        visual: "/features/gasless.png",
+        icon: (
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
+        )
     }
 ];
 
@@ -85,7 +95,7 @@ export default function HeroSection() {
     };
 
     return (
-        <main className="relative pb-20 pt-28 md:pt-30 md:pb-20 px-6 lg:px-12 flex items-center justify-center min-h-screen w-full overflow-x-hidden bg-[#FAFAFA]">
+        <main className="relative flex items-center justify-center min-h-screen lg:h-screen w-full overflow-y-auto lg:overflow-hidden bg-[#FAFAFA] pt-24 lg:pt-0 pb-12 lg:pb-0">
             {/* Interactive Background */}
             <Particles />
 
@@ -104,67 +114,78 @@ export default function HeroSection() {
                 <div className="grid lg:grid-cols-2 gap-8 lg:gap-16 items-center">
 
                     {/* Left Content: Value Propositions */}
-                    <div className="flex flex-col items-start gap-6 lg:gap-10">
+                    <div className="flex flex-col items-start gap-4 lg:gap-6 relative">
+                        {/* Decorative background flare for feature cards */}
+                        <div className="absolute -left-20 top-1/2 w-40 h-40 bg-[#FFB800]/5 rounded-full blur-3xl -z-10"></div>
+
                         <motion.div
                             initial={{ opacity: 0, x: -30 }}
                             animate={{ opacity: 1, x: 0 }}
                             transition={{ duration: 0.8 }}
-                            className="space-y-8 md:space-y-10"
+                            className="space-y-4"
                         >
-                            <span className="px-4 py-2 rounded-full bg-[#1A1A2E]/5 text-[#1A1A2E] text-[10px] lg:text-sm font-bold tracking-widest uppercase border border-[#1A1A2E]/10">
-                                Better Security • Better Experience
+                            <span className="px-4 py-1.5 rounded-full bg-white shadow-sm border border-gray-100 text-[#1A1A2E] text-[9px] lg:text-[11px] font-black tracking-[0.2em] uppercase">
+                                Next-Gen Authentication • Stellar Powered
                             </span>
-                            <h1 className="text-5xl md:text-6xl lg:text-8xl font-black text-transparent bg-clip-text bg-gradient-to-r from-[#4B5563] via-[#E5E7EB] via-70% to-[#FFB800] leading-[0.9] tracking-tighter">
-                                VAULTON.
+                            <h1 className="text-5xl md:text-6xl lg:text-8xl font-black tracking-tighter leading-[0.85] text-[#1A1A2E]">
+                                VAULT<span className="text-[#FFB800]">ON</span><span className="text-[0.4em] align-top text-gray-300">.</span>
                             </h1>
-                            <p className="text-lg md:text-xl lg:text-2xl text-gray-600 font-light max-w-lg leading-relaxed">
-                                The ultimate keyless wallet for a world without passwords.
+                            <p className="text-base md:text-lg lg:text-xl text-gray-400 font-medium max-w-md leading-tight">
+                                The flagship keyless wallet for a <span className="text-[#1A1A2E]">seedless future.</span>
                             </p>
                         </motion.div>
 
-                        <div className="grid gap-3 lg:gap-4 w-full max-w-md">
+                        <div className="grid gap-4 w-full max-w-md mt-2 relative">
+                            {/* Decorative dots grid behind cards */}
+                            <div className="absolute inset-0 opacity-[0.03] pointer-events-none -z-10 bg-[radial-gradient(#000_1px,transparent_1px)] [background-size:20px_20px]"></div>
+
                             {features.map((feature, index) => (
                                 <motion.div
                                     key={feature.title}
-                                    initial={{ opacity: 0, y: 20 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    transition={{ duration: 0.5, delay: 0.2 + (index * 0.1) }}
-                                    whileHover={{ x: 10 }}
+                                    initial={{ opacity: 0, x: -25 }}
+                                    animate={{ opacity: 1, x: 0 }}
+                                    transition={{ duration: 0.6, delay: 0.3 + (index * 0.1) }}
                                     onMouseEnter={() => setHoveredIndex(index)}
-                                    className={`flex cursor-pointer items-center gap-4 p-3 lg:p-4 rounded-2xl shadow-sm border transition-all duration-300 ${hoveredIndex === index
-                                        ? "bg-white border-[#FFB800]/20 shadow-md ring-1 ring-[#FFB800]/10"
-                                        : "bg-white/50 border-gray-100 hover:bg-white"
+                                    className={`group relative cursor-pointer p-4 lg:p-5 rounded-[2rem] transition-all duration-700 ease-out ${hoveredIndex === index
+                                        ? "bg-[#1A1A2E] shadow-[0_20px_40px_-10px_rgba(26,26,46,0.25)] -translate-y-1 scale-[1.02]"
+                                        : "bg-white/40 hover:bg-white/80 border border-gray-100/50 backdrop-blur-sm shadow-sm"
                                         }`}
                                 >
-                                    <div className={`w-10 h-10 lg:w-12 lg:h-12 flex items-center justify-center rounded-xl transition-colors duration-300 ${hoveredIndex === index ? "bg-[#FFB800] text-white" : "bg-[#F8F8F8] text-[#1A1A2E]"
+                                    {/* Prestige Index Marker */}
+                                    <div className={`absolute right-8 top-1/2 -translate-y-1/2 font-black italic text-5xl select-none transition-all duration-700 ${hoveredIndex === index ? "opacity-10 text-white translate-x-0" : "opacity-[0.02] text-black translate-x-4"
                                         }`}>
-                                        {feature.icon}
+                                        0{index + 1}
                                     </div>
-                                    <div className="flex-1">
-                                        <h3 className={`font-bold text-sm lg:text-base transition-colors ${hoveredIndex === index ? "text-[#FFB800]" : "text-[#1A1A2E]"}`}>
-                                            {feature.title}
-                                        </h3>
-                                        <p className="text-[10px] lg:text-xs text-gray-500">{feature.description}</p>
+
+                                    <div className="flex items-center gap-5 relative z-10">
+                                        <div className={`w-12 h-12 lg:w-14 lg:h-14 flex items-center justify-center rounded-2xl transition-all duration-700 transform ${hoveredIndex === index
+                                            ? "bg-gradient-to-br from-[#FFB800] to-[#E6A600] text-[#1A1A2E] rotate-6 scale-110 shadow-[0_10px_20px_rgba(255,184,0,0.3)]"
+                                            : "bg-gray-50 text-gray-400 group-hover:bg-[#1A1A2E] group-hover:text-white"
+                                            }`}>
+                                            <div className="scale-100">{feature.icon}</div>
+                                        </div>
+                                        <div className="flex-1">
+                                            <h3 className={`text-base lg:text-lg font-black tracking-tight transition-colors duration-500 ${hoveredIndex === index ? "text-white" : "text-[#1A1A2E]"
+                                                }`}>
+                                                {feature.title}
+                                            </h3>
+                                            <p className={`text-[11px] lg:text-xs font-medium transition-colors duration-500 ${hoveredIndex === index ? "text-gray-400" : "text-gray-500"
+                                                }`}>
+                                                {feature.description}
+                                            </p>
+                                        </div>
                                     </div>
+
+                                    {/* Active Glow Bar */}
+                                    {hoveredIndex === index && (
+                                        <motion.div
+                                            layoutId="activeGlow"
+                                            className="absolute left-0 top-1/4 bottom-1/4 w-1 bg-[#FFB800] rounded-r-full shadow-[2px_0_10px_rgba(255,184,0,0.5)]"
+                                        />
+                                    )}
                                 </motion.div>
                             ))}
                         </div>
-
-                        {/* PWA Download Button */}
-                        <motion.button
-                            onClick={handleInstallClick}
-                            whileHover={{ scale: 1.02 }}
-                            whileTap={{ scale: 0.98 }}
-                            className="group relative flex items-center gap-3 bg-[#1A1A2E] text-white px-8 py-4 lg:px-10 lg:py-5 rounded-2xl font-bold text-base lg:text-lg shadow-xl overflow-hidden hover:shadow-2xl transition-all"
-                        >
-                            <span className="relative z-10 flex items-center gap-3">
-                                <svg className="w-5 h-5 lg:w-6 lg:h-6 animate-bounce-slow" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                                </svg>
-                                Download Vaulton App
-                            </span>
-                            <div className="absolute inset-0 bg-gradient-to-r from-[#FFB800] to-[#E6A800] opacity-0 group-hover:opacity-10 transition-opacity duration-300"></div>
-                        </motion.button>
                     </div>
 
                     {/* Right Content: Interactive Visual */}
@@ -182,7 +203,8 @@ export default function HeroSection() {
                                 {/* Glowing Background Ring */}
                                 <div className={`absolute w-[120%] h-[120%] rounded-full blur-[100px] animate-pulse transition-colors duration-700 ${hoveredIndex === 0 ? "bg-[#FFB800]/10" :
                                     hoveredIndex === 1 ? "bg-amber-500/10" :
-                                        "bg-amber-600/10"
+                                        hoveredIndex === 2 ? "bg-amber-600/10" :
+                                            "bg-indigo-500/10"
                                     }`}></div>
 
                                 {/* Feature Visual */}
@@ -239,6 +261,31 @@ export default function HeroSection() {
                                 </motion.div>
                             </motion.div>
                         </AnimatePresence>
+
+                        {/* PWA Download Button - Shifted under visual */}
+                        <div className="absolute -bottom-8 lg:-bottom-16 w-full flex justify-center">
+                            <AnimatePresence>
+                                {deferredPrompt && (
+                                    <motion.button
+                                        initial={{ opacity: 0, y: 10 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        exit={{ opacity: 0, y: 10 }}
+                                        onClick={handleInstallClick}
+                                        whileHover={{ scale: 1.02 }}
+                                        whileTap={{ scale: 0.98 }}
+                                        className="group relative flex items-center gap-3 bg-[#1A1A2E] text-white px-8 py-4 lg:px-10 lg:py-4 rounded-2xl font-bold text-base shadow-xl overflow-hidden hover:shadow-2xl transition-all z-30"
+                                    >
+                                        <span className="relative z-10 flex items-center gap-3">
+                                            <svg className="w-5 h-5 animate-bounce-slow" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                            </svg>
+                                            Download Vaulton PWA
+                                        </span>
+                                        <div className="absolute inset-0 bg-gradient-to-r from-[#FFB800] to-[#E6A800] opacity-0 group-hover:opacity-10 transition-opacity duration-300"></div>
+                                    </motion.button>
+                                )}
+                            </AnimatePresence>
+                        </div>
                     </div>
 
                 </div>

@@ -42,7 +42,7 @@ export default function Navbar() {
 
     const navLinks = [
         { name: "Transactions", href: "/transactions" },
-        { name: "Autopay", href: "/#autopay" },
+        { name: "Autopay", href: "/scheduled-transactions" },
         { name: "FAQ", href: "/faq" },
         { name: "About", href: "/about" },
         { name: "Support", href: "/support" },

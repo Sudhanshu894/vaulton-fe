@@ -17,6 +17,23 @@ const alexBrush = Alex_Brush({
 export const metadata = {
   title: "Vaulton - Keyless wallet",
   description: "The ultimate keyless wallet with passkey authentication - secure your payments & enhance your experience with web3 wallet",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "Vaulton",
+  },
+  icons: {
+    icon: "/favicon.png",
+  },
+};
+
+export const viewport = {
+  themeColor: "#1A1A2E",
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
 };
 
 export default function RootLayout({ children }) {

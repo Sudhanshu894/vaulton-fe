@@ -1,11 +1,12 @@
 import axios from 'axios';
 
-const API_URL = "https://vaulton-backend-f8c2dge3b7fwfch6.centralindia-01.azurewebsites.net";
+const API_URL = "https://f8c3-2409-40d7-a8-6109-906b-5a7d-19ae-5972.ngrok-free.app";
 
 const api = axios.create({
     baseURL: API_URL,
     headers: {
         'Content-Type': 'application/json',
+        'ngrok-skip-browser-warning': 'true',
     },
 });
 
@@ -29,9 +30,9 @@ export const registerChallenge = async () => {
     }
 };
 
-export const verifyRegister = async (cred, tempUserId) => {
+export const verifyRegister = async (cred) => {
     try {
-        const response = await api.post('/register-verify', { cred, tempUserId });
+        const response = await api.post('/register-verify', { cred });
         return response.data;
     } catch (error) {
         console.error("Verify register failed:", error);
@@ -49,9 +50,9 @@ export const loginChallenge = async () => {
     }
 };
 
-export const verifyLogin = async (cred, challengeId) => {
+export const verifyLogin = async (cred) => {
     try {
-        const response = await api.post('/login-verify', { cred, challengeId });
+        const response = await api.post('/login-verify', { cred });
         return response.data;
     } catch (error) {
         console.error("Verify login failed:", error);
@@ -104,7 +105,6 @@ export const deploySmartAccount = async (factoryId, wasmHash, keyId, passkeyPubk
     try {
         const response = await api.post('/deploy-child', {
             factoryId,
-            wasmHash,
             keyId,
             passkeyPubkey,
             userId
@@ -118,10 +118,26 @@ export const deploySmartAccount = async (factoryId, wasmHash, keyId, passkeyPubk
 
 export const getTransactions = async (address, page = 1, limit = 5) => {
     try {
+        const safePage = Math.max(1, Number(page) || 1);
+        const safeLimit = Math.max(1, Number(limit) || 5);
+        const offset = (safePage - 1) * safeLimit;
         const response = await api.get('/transactions', {
-            params: { address, page, limit }
+            params: { address, limit: safeLimit, offset }
         });
-        return response.data;
+        const data = response.data || {};
+        const total = Number(data.total ?? data.count ?? 0);
+        const totalPages = Math.max(1, Math.ceil(total / safeLimit));
+
+        return {
+            ...data,
+            transactions: Array.isArray(data.transactions) ? data.transactions : [],
+            pagination: data.pagination || {
+                page: safePage,
+                limit: safeLimit,
+                total,
+                totalPages,
+            },
+        };
     } catch (error) {
         console.error("Get transactions failed:", error);
         throw error;
@@ -186,6 +202,225 @@ export const getScheduledTransactionById = async (id) => {
         return response.data;
     } catch (error) {
         console.error("Get scheduled transaction by ID failed:", error);
+        throw error;
+    }
+};
+
+// ZK Privacy Pool Services
+export const zkGenerateKeys = async (userId) => {
+    try {
+        const response = await api.post('/zk/keys/generate', { userId });
+        return response.data;
+    } catch (error) {
+        console.error("ZK Generate keys failed:", error);
+        throw error;
+    }
+};
+
+export const zkDeriveKeys = async (userId) => {
+    try {
+        const response = await api.post('/zk/keys/derive', { userId });
+        return response.data;
+    } catch (error) {
+        console.error("ZK Derive keys failed:", error);
+        throw error;
+    }
+};
+
+export const zkGetKeys = async (userId) => {
+    try {
+        const response = await api.get(`/zk/keys?userId=${userId}`);
+        return response.data;
+    } catch (error) {
+        console.error("ZK Get keys failed:", error);
+        throw error;
+    }
+};
+
+export const zkDeployChild = async (userId, forceRedeploy = false, saltTag = null) => {
+    try {
+        const response = await api.post('/zk/deploy-child', {
+            userId,
+            forceRedeploy,
+            saltTag
+        });
+        return response.data;
+    } catch (error) {
+        console.error("ZK Deploy child failed:", error);
+        throw error;
+    }
+};
+
+export const zkPrepareRegister = async (data) => {
+    try {
+        const response = await api.post('/zk/pool/prepare-register', data);
+        return response.data;
+    } catch (error) {
+        console.error("ZK Prepare register failed:", error);
+        throw error;
+    }
+};
+
+export const zkSubmitRegister = async (data) => {
+    try {
+        const response = await api.post('/zk/pool/submit-register', data);
+        return response.data;
+    } catch (error) {
+        console.error("ZK Submit register failed:", error);
+        throw error;
+    }
+};
+
+export const zkGetPoolBalance = async (userId) => {
+    try {
+        const response = await api.get(`/zk/pool/balance?userId=${userId}`);
+        return response.data;
+    } catch (error) {
+        console.error("ZK Get pool balance failed:", error);
+        throw error;
+    }
+};
+
+export const zkPrepareDeposit = async (data) => {
+    try {
+        const response = await api.post('/zk/pool/prepare-deposit', data);
+        return response.data;
+    } catch (error) {
+        console.error("ZK Prepare deposit failed:", error);
+        throw error;
+    }
+};
+
+export const zkSubmitDeposit = async (data) => {
+    try {
+        const response = await api.post('/zk/pool/submit-deposit', data);
+        return response.data;
+    } catch (error) {
+        console.error("ZK Submit deposit failed:", error);
+        throw error;
+    }
+};
+
+export const zkPrepareWithdrawal = async (data) => {
+    try {
+        const response = await api.post('/zk/pool/prepare-withdrawal', data);
+        return response.data;
+    } catch (error) {
+        console.error("ZK Prepare withdrawal failed:", error);
+        throw error;
+    }
+};
+
+export const zkSubmitWithdrawal = async (data) => {
+    try {
+        const response = await api.post('/zk/pool/submit-withdrawal', data);
+        return response.data;
+    } catch (error) {
+        console.error("ZK Submit withdrawal failed:", error);
+        throw error;
+    }
+};
+
+export const zkPrepareTransfer = async (data) => {
+    try {
+        const response = await api.post('/zk/pool/prepare-transfer', data);
+        return response.data;
+    } catch (error) {
+        console.error("ZK Prepare transfer failed:", error);
+        throw error;
+    }
+};
+
+export const zkSubmitTransfer = async (data) => {
+    try {
+        const response = await api.post('/zk/pool/submit-transfer', data);
+        return response.data;
+    } catch (error) {
+        console.error("ZK Submit transfer failed:", error);
+        throw error;
+    }
+};
+
+export const zkGetRecipientInfo = async (recipientUserId) => {
+    try {
+        const response = await api.get(`/zk/pool/recipient-info?recipientUserId=${recipientUserId}`);
+        return response.data;
+    } catch (error) {
+        console.error("ZK Recipient info failed:", error);
+        throw error;
+    }
+};
+
+export const zkGetRegisteredUsers = async () => {
+    try {
+        const response = await api.get('/zk/pool/registered-users');
+        return response.data;
+    } catch (error) {
+        console.error("ZK Registered users failed:", error);
+        throw error;
+    }
+};
+
+export const zkGetUserInfo = async (userId) => {
+    try {
+        const response = await api.get(`/zk/user-info?userId=${userId}`);
+        return response.data;
+    } catch (error) {
+        console.error("ZK User info failed:", error);
+        throw error;
+    }
+};
+
+export const backendBuildScheduledChallenge = async (data) => {
+    try {
+        const response = await api.post('/build-scheduled-challenge', data);
+        return response.data;
+    } catch (error) {
+        console.error("Build scheduled challenge failed:", error);
+        throw error;
+    }
+};
+
+export const backendScheduleTransfer = async (data) => {
+    try {
+        const response = await api.post('/schedule-transfer', data);
+        return response.data;
+    } catch (error) {
+        console.error("Schedule transfer failed:", error);
+        throw error;
+    }
+};
+
+export const backendListScheduledTransfers = async (childId, status) => {
+    try {
+        let q = [];
+        if (childId) q.push(`childId=${encodeURIComponent(childId)}`);
+        if (status) q.push(`status=${encodeURIComponent(status)}`);
+        const query = q.length > 0 ? `?${q.join('&')}` : '';
+        const response = await api.get(`/scheduled-transfers${query}`);
+        return response.data;
+    } catch (error) {
+        console.error("List scheduled transfers failed:", error);
+        throw error;
+    }
+};
+
+export const backendExecuteScheduledTransfer = async (txIdHex) => {
+    try {
+        const response = await api.post('/execute-scheduled-transfer', { txIdHex });
+        return response.data;
+    } catch (error) {
+        console.error("Execute scheduled transfer failed:", error);
+        throw error;
+    }
+};
+
+export const backendCancelScheduledTransfer = async (data) => {
+    try {
+        const response = await api.post('/cancel-scheduled-transfer', data);
+        return response.data;
+    } catch (error) {
+        console.error("Cancel scheduled transfer failed:", error);
         throw error;
     }
 };

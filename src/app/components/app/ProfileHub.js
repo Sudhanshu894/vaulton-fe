@@ -10,6 +10,15 @@ const formatMemberSince = (createdAt) => {
     return `Member since ${date.toLocaleString(undefined, { month: "short", year: "numeric" })}`;
 };
 
+const getProfileInitial = (name) => {
+    const text = String(name || "").trim();
+    if (!text) return "A";
+    const parts = text.split(/\s+/).filter(Boolean);
+    if (parts.length === 0) return "A";
+    if (parts.length === 1) return parts[0].slice(0, 1).toUpperCase();
+    return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+};
+
 export default function ProfileHub({ onBack, onLogout, user, onUserUpdated }) {
     const [subTab, setSubTab] = useState("profile");
     const [displayName, setDisplayName] = useState(user?.name || "");
@@ -53,7 +62,7 @@ export default function ProfileHub({ onBack, onLogout, user, onUserUpdated }) {
                         <div className="bg-white p-6 md:p-8 rounded-[3rem] border border-gray-100 shadow-xl flex flex-col items-center gap-6 min-w-0 overflow-hidden">
                             <div className="relative group shrink-0">
                                 <div className="w-24 h-24 bg-[#1A1A2E] text-white rounded-full flex items-center justify-center text-3xl font-black shadow-2xl relative z-10 group-hover:scale-105 transition-transform duration-500 uppercase">
-                                    {user?.userId ? user.userId[0] : "V"}
+                                    {getProfileInitial(user?.name)}
                                 </div>
                                 <div className="absolute -inset-2 bg-gradient-to-tr from-[#FFB800] to-blue-500 rounded-full blur opacity-20 group-hover:opacity-40 transition-opacity"></div>
                                 <button className="absolute bottom-0 right-0 p-2 bg-[#FFB800] text-[#1A1A2E] rounded-full shadow-lg border-4 border-white z-20 hover:scale-110 transition-transform">

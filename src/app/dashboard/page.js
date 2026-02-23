@@ -34,6 +34,15 @@ const formatBalance2 = (value) => {
     return num.toFixed(2);
 };
 
+const getUserInitials = (name) => {
+    const text = String(name || "").trim();
+    if (!text) return "A";
+    const parts = text.split(/\s+/).filter(Boolean);
+    if (parts.length === 0) return "A";
+    if (parts.length === 1) return parts[0].slice(0, 1).toUpperCase();
+    return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+};
+
 export default function DashboardPage() {
     const [activeTab, setActiveTab] = useState("home");
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -306,7 +315,7 @@ export default function DashboardPage() {
                     <AppHeader
                         onMenuClick={() => setIsSidebarOpen(true)}
                         onProfileClick={() => setActiveTab("profile")}
-                        userName={user ? (user.name ? user.name.split(' ').map(n => n[0]).join('') : "U") : "V"}
+                        userName={getUserInitials(user?.name)}
                     />
                 )}
 

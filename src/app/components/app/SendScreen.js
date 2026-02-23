@@ -176,6 +176,19 @@ const parseAmount = (value) => {
     return text;
 };
 
+const getShortPaymentError = (error) => {
+    const raw = String(error?.message || error || "").trim().toLowerCase();
+    if (!raw) return "Transaction failed. Please try again.";
+    if (raw.includes("insufficient")) return "Insufficient balance for this payment.";
+    if (raw.includes("cancel")) return "Payment was cancelled.";
+    if (raw.includes("session") || raw.includes("log in")) return "Session expired. Please log in again.";
+    if (raw.includes("recipient")) return "Invalid recipient address.";
+    if (raw.includes("nonce")) return "Payment sync issue. Please retry.";
+    if (raw.includes("network") || raw.includes("fetch")) return "Network issue. Please try again.";
+    if (raw.includes("passkey")) return "Passkey verification failed.";
+    return "Transaction failed. Please try again.";
+};
+
 export default function SendScreen({
     onBack,
     balance,
@@ -607,7 +620,7 @@ export default function SendScreen({
             }
         } catch (error) {
             console.error("Send payment failed", error);
-            setProcessingError(error?.message || "Payment failed");
+            setProcessingError(getShortPaymentError(error));
         } finally {
             setIsProcessingPayment(false);
         }
@@ -901,7 +914,7 @@ export default function SendScreen({
                             </div>
                             <div className={`flex items-center justify-center gap-2 ${anonymousMode ? "text-amber-600" : "text-[#10B981]"}`}>
                                 <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001 0 5.225-3.34 9.67-8 11.317C5.34 16.67 2 12.225 2 7c0-.682.057-1.35.166-2.001zm11.541 3.708a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg>
-                                <span className="text-[10px] font-black uppercase tracking-widest">{anonymousMode ? "Frontend simulated only • no history recorded" : "Confirmed request submitted to backend"}</span>
+                                <span className="text-[10px] font-black uppercase tracking-widest">{anonymousMode ? "Frontend simulated only • no history recorded" : "Secured transaction successful"}</span>
                             </div>
                             {paymentReceipt?.message && <p className="text-xs font-semibold text-gray-500 text-center">{paymentReceipt.message}</p>}
                         </div>

@@ -58,19 +58,14 @@ const addonOptions = [
     }
 ];
 
-export default function AddonsScreen({ onBack, onSelectAddon }) {
+export default function AddonsScreen({ onSelectAddon }) {
     return (
         <div className="space-y-8 animate-fade-in pb-24">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center">
                 <div>
                     <h3 className="text-3xl font-black text-[#1A1A2E]">Add-ons Hub</h3>
                     <p className="text-gray-400 font-bold text-sm">Supercharge your Smart Account</p>
                 </div>
-                <button onClick={onBack} className="p-3 bg-white border border-gray-100 rounded-2xl hover:bg-gray-50 transition-colors shadow-sm">
-                    <svg className="w-6 h-6 text-[#1A1A2E]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                </button>
             </div>
 
             <div className="grid gap-4">

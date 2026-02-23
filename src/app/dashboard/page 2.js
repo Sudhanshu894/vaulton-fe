@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import AppHeader from "../components/app/AppHeader 2";
+import { useState } from "react";
+import AppHeader from "../components/app/AppHeader";
 import AppBottomBar from "../components/app/AppBottomBar";
 import AppSidebar from "../components/app/AppSidebar";
 import DashboardHome from "../components/app/DashboardHome";
@@ -12,7 +12,7 @@ import AutopayHub from "../components/app/AutopayHub";
 import ProfileHub from "../components/app/ProfileHub";
 import WelcomeAuth from "../components/app/WelcomeAuth";
 import AnonymousPaymentHub from "../components/app/AnonymousPaymentHub";
-import StreamingPartnershipHub from "../components/app/StreamingPartnershipHub";
+import { useEffect } from "react";
 import { startRegistration, startAuthentication } from '@simplewebauthn/browser';
 import {
     registerChallenge,
@@ -23,16 +23,9 @@ import {
     deploySmartAccount,
     getUSDCBalance
 } from "@/services/backendservices";
-import { getDashboardSendPrefill } from "@/lib/paymentRequest";
 
 const FACTORY_ID = process.env.NEXT_PUBLIC_FACTORY_ID;
 const WASM_HASH = process.env.NEXT_PUBLIC_WASM_HASH;
-
-const formatBalance2 = (value) => {
-    const num = Number(value);
-    if (!Number.isFinite(num)) return "0.00";
-    return num.toFixed(2);
-};
 
 export default function DashboardPage() {
     const [activeTab, setActiveTab] = useState("home");
@@ -41,26 +34,8 @@ export default function DashboardPage() {
     const [user, setUser] = useState(null);
     const [isAuthLoading, setIsAuthLoading] = useState(true);
     const [isLoading, setIsLoading] = useState(false);
-    const [sendPrefill, setSendPrefill] = useState(null);
-
-    const persistUserSession = (nextUser) => {
-        setUser(nextUser);
-        sessionStorage.setItem('vaulton_user', JSON.stringify(nextUser));
-    };
 
     useEffect(() => {
-        const applyPrefillFromUrl = () => {
-            const parsedPrefill = getDashboardSendPrefill(new URLSearchParams(window.location.search));
-            setSendPrefill(parsedPrefill);
-            if (parsedPrefill?.tab === "send") {
-                setActiveTab("send");
-            } else if (parsedPrefill?.tab === "home") {
-                setActiveTab("home");
-            }
-        };
-
-        applyPrefillFromUrl();
-
         const savedUser = sessionStorage.getItem('vaulton_user');
         if (savedUser) {
             const parsedUser = JSON.parse(savedUser);
@@ -68,57 +43,20 @@ export default function DashboardPage() {
             if (parsedUser.smartAccountId) {
                 fetchBalance(parsedUser.smartAccountId);
             }
-            if (parsedUser.userId) {
-                getUserInfo(parsedUser.userId)
-                    .then((freshUserInfo) => {
-                        const refreshedUser = {
-                            userId: freshUserInfo.userId || parsedUser.userId,
-                            smartAccountId: freshUserInfo.smartAccountId || parsedUser.smartAccountId || "",
-                            passkeyPubkey: freshUserInfo.passkeyPubkey || parsedUser.passkeyPubkey || "",
-                            name: freshUserInfo.name ?? "",
-                            createdAt: freshUserInfo.createdAt || parsedUser.createdAt || "",
-                        };
-                        setUser(refreshedUser);
-                        sessionStorage.setItem('vaulton_user', JSON.stringify(refreshedUser));
-                        if (refreshedUser.smartAccountId && refreshedUser.smartAccountId !== parsedUser.smartAccountId) {
-                            fetchBalance(refreshedUser.smartAccountId);
-                        }
-                    })
-                    .catch((error) => {
-                        console.error("Failed to refresh user profile from API:", error);
-                    });
-            }
         }
         setIsAuthLoading(false);
-        window.addEventListener("popstate", applyPrefillFromUrl);
-        return () => {
-            window.removeEventListener("popstate", applyPrefillFromUrl);
-        };
     }, []);
 
     const fetchBalance = async (childId) => {
         try {
             const data = await getUSDCBalance(childId);
-            if (data?.balanceInUsdc != null) {
-                setBalance(formatBalance2(data.balanceInUsdc));
+            if (data.balanceInUsdc) {
+                setBalance(data.balanceInUsdc);
             }
         } catch (error) {
             console.error("Failed to fetch balance:", error);
         }
     };
-
-    useEffect(() => {
-        const childId = user?.smartAccountId;
-        if (!childId) return;
-
-        const pollId = window.setInterval(() => {
-            fetchBalance(childId);
-        }, 5000);
-
-        return () => {
-            window.clearInterval(pollId);
-        };
-    }, [user?.smartAccountId]);
 
     const handleRegister = async () => {
         setIsLoading(true);
@@ -171,11 +109,11 @@ export default function DashboardPage() {
                     userId: userId,
                     smartAccountId,
                     passkeyPubkey,
-                    name: userInfo.name || "",
-                    createdAt: userInfo.createdAt || "",
+                    name: userInfo.name || "User"
                 };
 
-                persistUserSession(newUser);
+                setUser(newUser);
+                sessionStorage.setItem('vaulton_user', JSON.stringify(newUser));
 
                 if (smartAccountId) {
                     await fetchBalance(smartAccountId);
@@ -225,11 +163,11 @@ export default function DashboardPage() {
                     userId: userInfo.userId,
                     smartAccountId: userInfo.smartAccountId,
                     passkeyPubkey: userInfo.passkeyPubkey,
-                    name: userInfo.name || "",
-                    createdAt: userInfo.createdAt || "",
+                    name: userInfo.name || "User"
                 };
 
-                persistUserSession(loggedInUser);
+                setUser(loggedInUser);
+                sessionStorage.setItem('vaulton_user', JSON.stringify(loggedInUser));
 
                 if (loggedInUser.smartAccountId) {
                     await fetchBalance(loggedInUser.smartAccountId);
@@ -256,31 +194,23 @@ export default function DashboardPage() {
         console.log("LOGOUT: User logged out successfully.");
     };
 
-    const handleUserUpdated = (partialUser) => {
-        if (!user) return;
-        const updatedUser = { ...user, ...partialUser };
-        persistUserSession(updatedUser);
-    };
-
     const renderContent = () => {
         switch (activeTab) {
             case "home":
                 return <DashboardHome onNavigate={setActiveTab} user={user} balance={balance} refreshBalance={() => fetchBalance(user?.smartAccountId)} />;
             case "send":
-                return <SendScreen onBack={() => setActiveTab("home")} balance={balance} user={user} prefill={sendPrefill} />;
+                return <SendScreen onBack={() => setActiveTab("home")} balance={balance} />;
             case "receive":
                 return <ReceiveScreen onBack={() => setActiveTab("home")} user={user} />;
             case "addons":
                 return <AddonsScreen onBack={() => setActiveTab("home")} onSelectAddon={setActiveTab} />;
             case "anonymous":
                 return <AnonymousPaymentHub onBack={() => setActiveTab("addons")} user={user} />;
-            case "streaming":
-                return <StreamingPartnershipHub onBack={() => setActiveTab("addons")} user={user} />;
             case "autopay":
                 return <AutopayHub onBack={() => setActiveTab("home")} user={user} />;
             case "profile":
             case "settings":
-                return <ProfileHub onBack={() => setActiveTab("home")} onLogout={handleLogout} user={user} onUserUpdated={handleUserUpdated} />;
+                return <ProfileHub onBack={() => setActiveTab("home")} onLogout={handleLogout} user={user} />;
             default:
                 return <DashboardHome onNavigate={setActiveTab} />;
         }
@@ -310,7 +240,7 @@ export default function DashboardPage() {
                     />
                 )}
 
-                <main className="flex-1 w-full px-4 md:px-10 py-6 max-w-7xl mx-auto pb-44 md:pb-6 pt-20 md:pt-0">
+                <main className="flex-1 w-full px-4 md:px-10 py-6 max-w-7xl mx-auto pb-44 md:pb-6 pt-28 md:pt-0">
                     {isAuthLoading ? (
                         <div className="h-full flex items-center justify-center">
                             <div className="w-8 h-8 border-4 border-[#FFB800]/20 border-t-[#FFB800] rounded-full animate-spin"></div>

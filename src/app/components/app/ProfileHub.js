@@ -1,10 +1,49 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { backendUpdateName } from "@/services/backendservices";
 
-export default function ProfileHub({ onBack, onLogout, user }) {
+const formatMemberSince = (createdAt) => {
+    const date = new Date(createdAt);
+    if (Number.isNaN(date.getTime())) return "Member since -";
+    return `Member since ${date.toLocaleString(undefined, { month: "short", year: "numeric" })}`;
+};
+
+export default function ProfileHub({ onBack, onLogout, user, onUserUpdated }) {
     const [subTab, setSubTab] = useState("profile");
+    const [displayName, setDisplayName] = useState(user?.name || "");
+    const [isSavingName, setIsSavingName] = useState(false);
+    const [nameMessage, setNameMessage] = useState({ type: "", text: "" });
+
+    const memberSinceLabel = useMemo(() => formatMemberSince(user?.createdAt), [user?.createdAt]);
+
+    useEffect(() => {
+        setDisplayName(user?.name || "");
+    }, [user?.name]);
+
+    const handleSaveName = async () => {
+        if (!user?.userId || isSavingName) return;
+
+        setIsSavingName(true);
+        setNameMessage({ type: "", text: "" });
+        try {
+            const nextName = String(displayName || "").trim() || "Anonymous";
+            const response = await backendUpdateName(user.userId, nextName);
+            if (response?.success === false) {
+                throw new Error(response?.error || "Failed to update name");
+            }
+
+            setDisplayName(nextName);
+            onUserUpdated?.({ name: nextName });
+            setNameMessage({ type: "success", text: "Name updated" });
+        } catch (error) {
+            console.error("Failed to update profile name", error);
+            setNameMessage({ type: "error", text: error?.response?.data?.error || error?.message || "Failed to update name" });
+        } finally {
+            setIsSavingName(false);
+        }
+    };
 
     const renderSubTab = () => {
         switch (subTab) {
@@ -29,12 +68,37 @@ export default function ProfileHub({ onBack, onLogout, user }) {
                                 <p className="text-gray-400 font-mono text-[10px] uppercase tracking-widest mt-1 truncate px-2">
                                     {user?.smartAccountId ? `${user.smartAccountId.slice(0, 6)}...${user.smartAccountId.slice(-6)}` : "No Smart Account"}
                                 </p>
-                                <p className="text-[#FFB800] text-[9px] font-black uppercase tracking-[0.2em] mt-2">Member since Jan 2025</p>
+                                <p className="text-[#FFB800] text-[9px] font-black uppercase tracking-[0.2em] mt-2">{memberSinceLabel}</p>
                             </div>
                         </div>
 
                         <div className="space-y-6">
                             <div className="bg-white p-6 rounded-[2.5rem] border border-gray-100 space-y-4">
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Display Name</label>
+                                    <div className="flex items-center gap-2">
+                                        <input
+                                            type="text"
+                                            value={displayName}
+                                            onChange={(e) => setDisplayName(e.target.value.slice(0, 50))}
+                                            placeholder="Anonymous"
+                                            className="w-full bg-[#F8F9FB] p-4 rounded-2xl text-sm font-bold border border-transparent outline-none transition-all"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={handleSaveName}
+                                            disabled={isSavingName}
+                                            className="px-4 py-4 rounded-2xl bg-[#1A1A2E] text-white text-[10px] font-black uppercase tracking-widest disabled:opacity-50"
+                                        >
+                                            {isSavingName ? "Saving" : "Save"}
+                                        </button>
+                                    </div>
+                                    {nameMessage.text && (
+                                        <p className={`text-xs font-semibold px-1 ${nameMessage.type === "success" ? "text-emerald-600" : "text-red-500"}`}>
+                                            {nameMessage.text}
+                                        </p>
+                                    )}
+                                </div>
                                 <div className="space-y-1">
                                     <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">User Identifier</label>
                                     <input type="text" value={`@${user?.userId || ""}`} readOnly className="w-full bg-[#F8F9FB] p-4 rounded-2xl text-sm font-bold border border-transparent outline-none transition-all cursor-not-allowed" />
@@ -106,8 +170,8 @@ export default function ProfileHub({ onBack, onLogout, user }) {
                                 </div>
                                 <code className="text-[10px] font-mono text-emerald-400 block break-all leading-tight">
                                     npm install @vaulton/sdk<br />
-                                    <span className="text-blue-400">const</span> vault = <span className="text-yellow-400">new</span> Vaulton(<span className="text-orange-400">'YOUR_API_KEY'</span>);<br />
-                                    <span className="text-blue-400">await</span> vault.pay({'{'} amount: <span className="text-purple-400">'50.00'</span> {'}'});
+                                    <span className="text-blue-400">const</span> vault = <span className="text-yellow-400">new</span> Vaulton(<span className="text-orange-400">&apos;YOUR_API_KEY&apos;</span>);<br />
+                                    <span className="text-blue-400">await</span> vault.pay({'{'} amount: <span className="text-purple-400">&apos;50.00&apos;</span> {'}'});
                                 </code>
                             </div>
 

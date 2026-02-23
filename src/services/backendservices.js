@@ -70,6 +70,16 @@ export const getUserInfo = async (userId) => {
     }
 };
 
+export const backendUpdateName = async (userId, name) => {
+    try {
+        const response = await api.post('/update-name', { userId, name });
+        return response.data;
+    } catch (error) {
+        console.error("Update name failed:", error);
+        throw error;
+    }
+};
+
 export const getUSDCBalance = async (childId) => {
     try {
         const response = await api.post('/get-usdc-balance', { childId });

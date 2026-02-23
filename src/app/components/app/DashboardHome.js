@@ -63,9 +63,10 @@ export default function DashboardHome({ onNavigate, user, balance, refreshBalanc
         }
 
         let cancelled = false;
-        setIsLoadingPreviews(true);
 
-        (async () => {
+        const loadPreviews = async (silent = false) => {
+            if (!silent) setIsLoadingPreviews(true);
+
             try {
                 const [autopayData, txData] = await Promise.all([
                     backendListScheduledTransfers(walletAddress),
@@ -84,20 +85,26 @@ export default function DashboardHome({ onNavigate, user, balance, refreshBalanc
                 setRecentTransactions(Array.isArray(txData?.transactions) ? txData.transactions.slice(0, 4) : []);
             } catch (error) {
                 console.error("Failed to load dashboard previews", error);
-                if (!cancelled) {
+                if (!cancelled && !silent) {
                     setAutopayPreview([]);
                     setAllActiveAutopays([]);
                     setRecentTransactions([]);
                 }
             } finally {
-                if (!cancelled) {
+                if (!cancelled && !silent) {
                     setIsLoadingPreviews(false);
                 }
             }
-        })();
+        };
+
+        loadPreviews(false);
+        const pollId = window.setInterval(() => {
+            loadPreviews(true);
+        }, 5000);
 
         return () => {
             cancelled = true;
+            window.clearInterval(pollId);
         };
     }, [walletAddress]);
 

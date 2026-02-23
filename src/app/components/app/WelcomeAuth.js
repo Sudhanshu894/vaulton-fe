@@ -1,9 +1,70 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import { motion } from "framer-motion";
 
 export default function WelcomeAuth({ onLogin, onRegister, isLoading }) {
+    const [deferredInstallPrompt, setDeferredInstallPrompt] = useState(null);
+    const [isStandalone, setIsStandalone] = useState(false);
+    const [isInstalling, setIsInstalling] = useState(false);
+    const [installInfo, setInstallInfo] = useState("");
+
+    useEffect(() => {
+        const detectStandalone = () =>
+            window.matchMedia?.("(display-mode: standalone)")?.matches ||
+            window.navigator.standalone === true;
+
+        setIsStandalone(detectStandalone());
+
+        const handleBeforeInstallPrompt = (event) => {
+            event.preventDefault();
+            setDeferredInstallPrompt(event);
+            setIsStandalone(detectStandalone());
+        };
+
+        const handleAppInstalled = () => {
+            setIsStandalone(true);
+            setDeferredInstallPrompt(null);
+            setInstallInfo("");
+        };
+
+        window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+        window.addEventListener("appinstalled", handleAppInstalled);
+
+        return () => {
+            window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+            window.removeEventListener("appinstalled", handleAppInstalled);
+        };
+    }, []);
+
+    const handleInstallApp = async () => {
+        if (isInstalling) return;
+        if (!deferredInstallPrompt) {
+            const isIos = /iphone|ipad|ipod/i.test(window.navigator.userAgent);
+            setInstallInfo(
+                isIos
+                    ? "On iPhone/iPad: Share → Add to Home Screen."
+                    : "Use your browser menu and choose Install App."
+            );
+            return;
+        }
+
+        setIsInstalling(true);
+        setInstallInfo("");
+        try {
+            await deferredInstallPrompt.prompt();
+            await deferredInstallPrompt.userChoice;
+            setDeferredInstallPrompt(null);
+        } catch (error) {
+            console.error("PWA install prompt failed:", error);
+        } finally {
+            setIsInstalling(false);
+        }
+    };
+
+    const showInstallButton = !isStandalone;
+
     return (
         <div className="h-full flex flex-col items-center justify-center space-y-12 py-12 animate-fade-in text-center">
             <motion.div
@@ -42,6 +103,22 @@ export default function WelcomeAuth({ onLogin, onRegister, isLoading }) {
                 >
                     {isLoading ? "Creating Account..." : "Create One"}
                 </button>
+
+                {showInstallButton && (
+                    <>
+                        <button
+                            type="button"
+                            onClick={handleInstallApp}
+                            disabled={isLoading || isInstalling}
+                            className="w-full py-4 bg-[#1A1A2E] text-white rounded-[2rem] font-black text-xs uppercase tracking-widest shadow-lg hover:shadow-xl active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            {isInstalling ? "Preparing..." : "Download App"}
+                        </button>
+                        {installInfo && (
+                            <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">{installInfo}</p>
+                        )}
+                    </>
+                )}
             </div>
 
             <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-8">

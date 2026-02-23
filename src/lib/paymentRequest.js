@@ -18,6 +18,11 @@ const firstNonEmpty = (...values) => {
   return "";
 };
 
+const truthyParam = (value) => {
+  const text = String(value || "").trim().toLowerCase();
+  return text === "1" || text === "true" || text === "yes" || text === "on";
+};
+
 const extractAddress = (text) => {
   const stellarMatch = text.match(STELLAR_ADDRESS_RE);
   if (stellarMatch) return stellarMatch[0];
@@ -38,6 +43,38 @@ export const buildVaultonSendLink = ({ origin, recipient, amount }) => {
     url.searchParams.set("amount", normalizedAmount);
   }
   url.searchParams.set("source", "vaulton_request");
+  return url.toString();
+};
+
+export const buildVaultonTipLink = ({
+  origin,
+  slug,
+  recipient,
+  amount,
+  minAmount,
+  creatorName,
+}) => {
+  if (!origin || !recipient) return "";
+  const normalizedSlug = String(slug || recipient || "creator")
+    .replace(/[^a-zA-Z0-9-]/g, "")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "") || "creator";
+
+  const url = new URL(`/tip/${normalizedSlug}`, origin);
+  url.searchParams.set("recipient", recipient);
+  url.searchParams.set("tip", "1");
+
+  const normalizedAmount = sanitizeAmount(amount);
+  if (normalizedAmount) {
+    url.searchParams.set("amount", normalizedAmount);
+  }
+  const normalizedMinAmount = sanitizeAmount(minAmount);
+  if (normalizedMinAmount) {
+    url.searchParams.set("minAmount", normalizedMinAmount);
+  }
+  if (creatorName) {
+    url.searchParams.set("creatorName", String(creatorName));
+  }
   return url.toString();
 };
 
@@ -151,13 +188,46 @@ export const getDashboardSendPrefill = (searchParams) => {
     searchParams.get("address")
   );
   const directAmount = sanitizeAmount(searchParams.get("amount"));
+  const tipMode = truthyParam(
+    firstNonEmpty(
+      searchParams.get("tip"),
+      searchParams.get("superchat"),
+      searchParams.get("donation")
+    )
+  );
+  const creatorName = firstNonEmpty(
+    searchParams.get("creatorName"),
+    searchParams.get("creator"),
+    searchParams.get("name")
+  );
+  const creatorUserId = firstNonEmpty(
+    searchParams.get("creatorUserId"),
+    searchParams.get("creatorId")
+  );
+  const defaultMessage = firstNonEmpty(
+    searchParams.get("message"),
+    searchParams.get("tipMessage")
+  );
+  const tipMinAmount = sanitizeAmount(
+    firstNonEmpty(
+      searchParams.get("minAmount"),
+      searchParams.get("minimumAmount"),
+      searchParams.get("tipMin"),
+      searchParams.get("tipMinimum")
+    )
+  );
 
-  if (tab === "send" || directRecipient || directAmount) {
+  if (tab === "send" || directRecipient || directAmount || tipMode) {
     return {
       tab: "send",
       recipient: directRecipient,
       amount: directAmount,
       source: firstNonEmpty(searchParams.get("source"), "dashboard-link"),
+      tipMode,
+      creatorName,
+      creatorUserId,
+      defaultMessage,
+      tipMinAmount,
     };
   }
 

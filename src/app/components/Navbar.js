@@ -23,10 +23,23 @@ export default function Navbar() {
         setIsMenuOpen(false);
         router.push(href);
     };
-
     return (
         <nav className="fixed top-4 left-0 right-0 z-50 flex justify-center px-6 pointer-events-none">
-            <div className="w-full max-w-7xl bg-white/70 backdrop-blur-xl border border-white/20 shadow-[0_8px_32px_rgba(0,0,0,0.05)] rounded-[2rem] md:rounded-full px-6 lg:px-12 pointer-events-auto overflow-hidden md:overflow-visible">
+            {/* Click outside overlay */}
+            <AnimatePresence>
+                {isMenuOpen && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.1 }}
+                        onClick={() => setIsMenuOpen(false)}
+                        className="fixed inset-[-50vh_-50vw] w-[200vw] h-[200vh] pointer-events-auto bg-transparent z-[-1]"
+                    />
+                )}
+            </AnimatePresence>
+
+            <div className="w-full max-w-7xl bg-white/70 backdrop-blur-xl border border-white/20 shadow-[0_8px_32px_rgba(0,0,0,0.05)] rounded-[2rem] md:rounded-full px-6 lg:px-12 pointer-events-auto overflow-hidden md:overflow-visible relative">
                 <div className="flex items-center justify-between h-16 md:h-20">
                     {/* Logo */}
                     <div className="flex items-center gap-2 group cursor-pointer" onClick={() => handleLinkClick("/")}>
@@ -72,11 +85,7 @@ export default function Navbar() {
                             aria-label="Toggle Menu"
                         >
                             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                {isMenuOpen ? (
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                ) : (
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-                                )}
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
                             </svg>
                         </button>
                     </div>
@@ -89,7 +98,7 @@ export default function Navbar() {
                             initial={{ opacity: 0, height: 0 }}
                             animate={{ opacity: 1, height: "auto" }}
                             exit={{ opacity: 0, height: 0 }}
-                            transition={{ duration: 0.3, ease: "easeInOut" }}
+                            transition={{ duration: 0.1, ease: "easeOut" }}
                             className="md:hidden overflow-hidden"
                         >
                             <div className="flex flex-col py-6 gap-6">

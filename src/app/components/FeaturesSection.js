@@ -2,103 +2,113 @@
 
 import { motion } from "framer-motion";
 
+function FeatureCard({ title, desc, number, icon, className, titleClassName = "" }) {
+    return (
+        <motion.article
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, amount: 0.25 }}
+            whileHover={{ y: -4 }}
+            className={`relative overflow-hidden rounded-[2rem] border border-gray-100 shadow-sm ${className}`}
+        >
+            <div className="absolute right-4 top-4 text-5xl md:text-6xl font-black text-black/10 select-none">{number}</div>
+            <div className="p-6 md:p-7 h-full flex flex-col">
+                <div className="w-12 h-12 rounded-2xl bg-white/90 border border-white/70 shadow-sm flex items-center justify-center text-[#1A1A2E]">
+                    {icon}
+                </div>
+                <h4 className={`mt-5 text-2xl md:text-3xl font-black tracking-tight ${titleClassName}`}>{title}</h4>
+                <p className="mt-2 text-sm md:text-base leading-relaxed text-gray-600 font-semibold">{desc}</p>
+            </div>
+        </motion.article>
+    );
+}
+
 export default function FeaturesSection() {
     return (
-        <section id="features" className="py-24 bg-[#FAFAFA] relative overflow-hidden">
-            {/* Decorative background blur */}
-            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-full bg-[radial-gradient(#FFB80010_1px,transparent_1px)] [background-size:40px_40px] opacity-30"></div>
+        <section id="features" className="py-20 md:py-24 bg-[#FAFAFA] relative overflow-hidden">
+            <div className="absolute inset-0 bg-[radial-gradient(#FFB80014_1px,transparent_1px)] [background-size:28px_28px] opacity-40" />
 
-            <div className="max-w-7xl mx-auto px-6 relative z-10">
-                <div className="text-center mb-20 lg:mb-32">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+                <div className="text-center mb-12 md:mb-16">
                     <motion.span
-                        initial={{ opacity: 0, y: 10 }}
+                        initial={{ opacity: 0, y: 8 }}
                         whileInView={{ opacity: 1, y: 0 }}
                         viewport={{ once: true }}
-                        className="text-[#FFB800] font-black tracking-[0.2em] uppercase text-sm mb-4 block"
+                        className="text-[#FFB800] font-black tracking-[0.18em] uppercase text-xs md:text-sm mb-3 block"
                     >
                         The Vaulton Edge
                     </motion.span>
                     <motion.h2
-                        initial={{ opacity: 0, y: 20 }}
+                        initial={{ opacity: 0, y: 14 }}
                         whileInView={{ opacity: 1, y: 0 }}
                         viewport={{ once: true }}
-                        className="text-4xl md:text-6xl font-black text-[#1A1A2E] tracking-tight"
+                        className="text-3xl sm:text-4xl md:text-5xl font-black text-[#1A1A2E] tracking-tight"
                     >
-                        Main Features <span className="text-gray-300">&</span> USPs
+                        Features Built Like Products
                     </motion.h2>
                 </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
-                    {/* Card 1: Passkey */}
-                    <motion.div
-                        initial={{ opacity: 0, y: 30 }}
-                        whileInView={{ opacity: 1, y: 0 }}
-                        viewport={{ once: true }}
-                        whileHover={{ y: -15, scale: 1.02 }}
-                        className="group relative bg-[#1A1A2E] p-12 rounded-[4rem] overflow-hidden shadow-2xl transition-all duration-500"
-                    >
-                        <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-bl-full transition-all group-hover:bg-white/10"></div>
-                        <div className="relative z-10">
-                            <div className="mb-10 p-5 bg-white/10 w-fit rounded-3xl backdrop-blur-md border border-white/10 text-[#FFB800]">
-                                <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 00-2 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                                </svg>
-                            </div>
-                            <h4 className="text-3xl font-black text-white mb-8 leading-tight">Biometric <br />Citadel</h4>
-                            <p className="text-gray-400 font-medium leading-relaxed text-lg">
-                                Your biometrics are the only key. Powered by hardware-level secure enclaves, we've eliminated seed phrase vulnerability forever.
-                            </p>
-                        </div>
-                        <div className="absolute bottom-10 right-12 text-white/5 text-9xl font-black italic select-none">01</div>
-                    </motion.div>
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 auto-rows-[220px] md:auto-rows-[240px] gap-4 md:gap-5">
+                    <FeatureCard
+                        number="01"
+                        title="Secured Keyless Wallet"
+                        desc="No seed phrase, no manual key backups. Biometrics are your native access layer."
+                        className="md:col-span-2 xl:col-span-2 xl:row-span-2 bg-[#1A1A2E] text-white border-[#1A1A2E]"
+                        titleClassName="text-white"
+                        icon={
+                            <svg className="w-6 h-6 text-[#FFB800]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15 7a5 5 0 00-9.75 1.5v2.25H4A2 2 0 002 12.75v5.5A2 2 0 004 20.25h10a2 2 0 002-2v-5.5A2 2 0 0014 10.75h-1.25V8.5A2.5 2.5 0 1115 11h2a4.5 4.5 0 00-2-4z" />
+                            </svg>
+                        }
+                    />
 
-                    {/* Card 2: Gasless */}
-                    <motion.div
-                        initial={{ opacity: 0, y: 30 }}
-                        whileInView={{ opacity: 1, y: 0 }}
-                        viewport={{ once: true }}
-                        transition={{ delay: 0.2 }}
-                        whileHover={{ y: -15, scale: 1.02 }}
-                        className="group relative bg-white p-12 rounded-[4rem] border border-gray-100 shadow-xl transition-all duration-500"
-                    >
-                        <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-50 rounded-bl-full transition-all group-hover:bg-indigo-100/50"></div>
-                        <div className="relative z-10">
-                            <div className="mb-10 p-5 bg-indigo-50 w-fit rounded-3xl text-indigo-600 shadow-sm border border-indigo-100">
-                                <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                                </svg>
-                            </div>
-                            <h4 className="text-3xl font-black text-[#1A1A2E] mb-8 leading-tight">The Gasless <br />Protocol</h4>
-                            <p className="text-gray-600 font-medium leading-relaxed text-lg">
-                                Forget XLM balances. Every transaction is fuel-free for the user, powered by our high-performance paymaster infrastructure.
-                            </p>
-                        </div>
-                        <div className="absolute bottom-10 right-12 text-gray-50 text-9xl font-black italic select-none">02</div>
-                    </motion.div>
+                    <FeatureCard
+                        number="02"
+                        title="Biometric Authentication"
+                        desc="Passkeys and device security modules keep signing frictionless and secure."
+                        className="bg-white"
+                        icon={
+                            <svg className="w-6 h-6 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M12 11a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 0114 0" />
+                            </svg>
+                        }
+                    />
 
-                    {/* Card 3: Autopay */}
-                    <motion.div
-                        initial={{ opacity: 0, y: 30 }}
-                        whileInView={{ opacity: 1, y: 0 }}
-                        viewport={{ once: true }}
-                        transition={{ delay: 0.4 }}
-                        whileHover={{ y: -15, scale: 1.02 }}
-                        className="group relative bg-gradient-to-br from-[#FFB800] to-[#E6A600] p-12 rounded-[4rem] shadow-2xl transition-all duration-500"
-                    >
-                        <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-bl-full"></div>
-                        <div className="relative z-10">
-                            <div className="mb-10 p-5 bg-white/20 w-fit rounded-3xl backdrop-blur-lg border border-white/20 text-[#1A1A2E]">
-                                <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                                </svg>
-                            </div>
-                            <h4 className="text-3xl font-black text-[#1A1A2E] mb-8 leading-tight">Immutable <br />Autopay</h4>
-                            <p className="text-[#1A1A2E]/80 font-bold leading-relaxed text-lg">
-                                A protocol-level commitment. We cannot temper transactions once scheduled—ensuring absolute reliability and trust in every payment.
-                            </p>
-                        </div>
-                        <div className="absolute bottom-10 right-12 text-white/20 text-9xl font-black italic select-none">03</div>
-                    </motion.div>
+                    <FeatureCard
+                        number="03"
+                        title="Gasless Payments"
+                        desc="Users don’t manage network fuel manually. Transfers feel like web2 payments."
+                        className="bg-white"
+                        icon={
+                            <svg className="w-6 h-6 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M13 2L3 14h7l-1 8 10-12h-7l1-8z" />
+                            </svg>
+                        }
+                    />
+
+                    <FeatureCard
+                        number="04"
+                        title="Smart Autopay"
+                        desc="Schedule payments with passkey authorization and clear lifecycle states."
+                        className="md:col-span-2 xl:col-span-1 bg-gradient-to-br from-[#FFF5DF] to-[#FFE9B8]"
+                        icon={
+                            <svg className="w-6 h-6 text-[#B7791F]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M4 4v5h.6m14.8 2A8 8 0 004.6 9M20 20v-5h-.6M5 13a8 8 0 0014.4 2" />
+                            </svg>
+                        }
+                    />
+
+                    <FeatureCard
+                        number="05"
+                        title="Streaming + Tips"
+                        desc="Share tip links and overlays so creators can receive and surface SuperChats live."
+                        className="md:col-span-2 xl:col-span-1 bg-white"
+                        icon={
+                            <svg className="w-6 h-6 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15 10l4.5-2.2a1 1 0 011.5.9v6.6a1 1 0 01-1.5.9L15 14m-9 4h6a2 2 0 002-2V8a2 2 0 00-2-2H6a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                            </svg>
+                        }
+                    />
                 </div>
             </div>
         </section>

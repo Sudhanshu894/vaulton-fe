@@ -16,7 +16,7 @@ export default function Home() {
       <TeamSection />
 
       {/* Footer minimal */}
-      <footer className="py-12 px-6 border-t border-gray-100 bg-white">
+      {/* <footer className="py-12 px-6 border-t border-gray-100 bg-white">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-8">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-lg bg-[#FFB800] flex items-center justify-center p-1.5 shadow-sm">
@@ -31,7 +31,7 @@ export default function Home() {
             <a href="#" className="hover:text-[#FFB800]">Twitter</a>
           </div>
         </div>
-      </footer>
+      </footer> */}
     </main>
   );
 }

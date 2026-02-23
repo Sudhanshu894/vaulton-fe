@@ -110,7 +110,7 @@ export default function HeroSection() {
                 }}
             />
 
-            <div className="w-full max-w-7xl mx-auto relative z-20">
+            <div className="w-full max-w-7xl mx-auto px-6 lg:px-8 relative z-20">
                 <div className="grid lg:grid-cols-2 gap-8 lg:gap-16 items-center">
 
                     {/* Left Content: Value Propositions */}
@@ -124,10 +124,10 @@ export default function HeroSection() {
                             transition={{ duration: 0.8 }}
                             className="space-y-4"
                         >
-                            <span className="px-4 py-1.5 rounded-full bg-white shadow-sm border border-gray-100 text-[#1A1A2E] text-[9px] lg:text-[11px] font-black tracking-[0.2em] uppercase">
+                            <span className="px-4 py-1.5 rounded-full bg-white shadow-sm border border-gray-100 text-[#1A1A2E] text-[7px] lg:text-[9px] font-black tracking-[0.2em] uppercase">
                                 Next-Gen Authentication • Stellar Powered
                             </span>
-                            <h1 className="text-5xl md:text-6xl lg:text-8xl font-black tracking-tighter leading-[0.85] text-[#1A1A2E]">
+                            <h1 className="text-5xl mt-2 md:text-6xl lg:text-8xl font-black tracking-tighter leading-[0.85] text-[#1A1A2E]">
                                 VAULT<span className="text-[#FFB800]">ON</span><span className="text-[0.4em] align-top text-gray-300">.</span>
                             </h1>
                             <p className="text-base md:text-lg lg:text-xl text-gray-400 font-medium max-w-md leading-tight">
@@ -189,78 +189,80 @@ export default function HeroSection() {
                     </div>
 
                     {/* Right Content: Interactive Visual */}
-                    <div className="relative flex items-center justify-center h-[400px] lg:h-[600px] w-full mt-10 lg:mt-0">
-                        <AnimatePresence mode="wait">
-                            <motion.div
-                                key={hoveredIndex}
-                                initial={{ opacity: 0, scale: 0.9, rotateY: -10 }}
-                                animate={{ opacity: 1, scale: 1, rotateY: 0 }}
-                                exit={{ opacity: 0, scale: 1.1, rotateY: 10 }}
-                                transition={{ duration: 0.5, ease: "circOut" }}
-                                style={{ rotateX, rotateY, transformStyle: "preserve-3d" }}
-                                className="relative flex items-center justify-center perspective-1000 w-full"
-                            >
-                                {/* Glowing Background Ring */}
-                                <div className={`absolute w-[120%] h-[120%] rounded-full blur-[100px] animate-pulse transition-colors duration-700 ${hoveredIndex === 0 ? "bg-[#FFB800]/10" :
-                                    hoveredIndex === 1 ? "bg-amber-500/10" :
-                                        hoveredIndex === 2 ? "bg-amber-600/10" :
-                                            "bg-indigo-500/10"
-                                    }`}></div>
-
-                                {/* Feature Visual */}
+                    <div className="relative flex items-center justify-center h-[100px] lg:h-[600px] w-full mt-10 lg:mt-0">
+                        <div className="hidden lg:block w-full">
+                            <AnimatePresence mode="wait">
                                 <motion.div
-                                    animate={{ y: [0, -20, 0] }}
-                                    transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
-                                    className="relative z-10 drop-shadow-[0_35px_35px_rgba(0,0,0,0.15)] w-full flex justify-center"
+                                    key={hoveredIndex}
+                                    initial={{ opacity: 0, scale: 0.9, rotateY: -10 }}
+                                    animate={{ opacity: 1, scale: 1, rotateY: 0 }}
+                                    exit={{ opacity: 0, scale: 1.1, rotateY: 10 }}
+                                    transition={{ duration: 0.5, ease: "circOut" }}
+                                    style={{ rotateX, rotateY, transformStyle: "preserve-3d" }}
+                                    className="relative flex items-center justify-center perspective-1000 w-full"
                                 >
-                                    <Image
-                                        src={features[hoveredIndex].visual}
-                                        alt={features[hoveredIndex].title}
-                                        width={500}
-                                        height={500}
-                                        className="w-[280px] sm:w-[350px] lg:w-[450px] h-auto rounded-[2rem] object-contain"
-                                        priority
-                                    />
-                                </motion.div>
+                                    {/* Glowing Background Ring */}
+                                    <div className={`absolute w-[120%] h-[120%] rounded-full blur-[100px] animate-pulse transition-colors duration-700 ${hoveredIndex === 0 ? "bg-[#FFB800]/10" :
+                                        hoveredIndex === 1 ? "bg-amber-500/10" :
+                                            hoveredIndex === 2 ? "bg-amber-600/10" :
+                                                "bg-indigo-500/10"
+                                        }`}></div>
 
-                                {/* Absolute Floating Elements */}
-                                <motion.div
-                                    style={{ translateZ: 100 }}
-                                    className="absolute top-10 -right-4 lg:-right-10 animate-float z-20 hidden md:block"
-                                >
-                                    <FloatingCard className="p-3 bg-white/90 backdrop-blur shadow-2xl border border-white/50 rounded-2xl">
-                                        <div className="flex items-center gap-4">
-                                            <div className="w-10 h-10 bg-[#FFB800] rounded-full flex items-center justify-center text-white">
-                                                <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
-                                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                                                </svg>
+                                    {/* Feature Visual */}
+                                    <motion.div
+                                        animate={{ y: [0, -20, 0] }}
+                                        transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
+                                        className="relative z-10 drop-shadow-[0_35px_35px_rgba(0,0,0,0.15)] w-full flex justify-center"
+                                    >
+                                        <Image
+                                            src={features[hoveredIndex].visual}
+                                            alt={features[hoveredIndex].title}
+                                            width={500}
+                                            height={500}
+                                            className="w-[280px] sm:w-[350px] lg:w-[450px] h-auto rounded-[2rem] object-contain"
+                                            priority
+                                        />
+                                    </motion.div>
+
+                                    {/* Absolute Floating Elements */}
+                                    <motion.div
+                                        style={{ translateZ: 100 }}
+                                        className="absolute top-10 -right-4 lg:-right-10 animate-float z-20 hidden md:block"
+                                    >
+                                        <FloatingCard className="p-3 bg-white/90 backdrop-blur shadow-2xl border border-white/50 rounded-2xl">
+                                            <div className="flex items-center gap-4">
+                                                <div className="w-10 h-10 bg-[#FFB800] rounded-full flex items-center justify-center text-white">
+                                                    <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+                                                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                                    </svg>
+                                                </div>
+                                                <div className="pr-4">
+                                                    <p className="text-[10px] text-gray-500 uppercase font-black">Status</p>
+                                                    <p className="font-bold text-[#1A1A2E]">Active</p>
+                                                </div>
                                             </div>
-                                            <div className="pr-4">
-                                                <p className="text-[10px] text-gray-500 uppercase font-black">Status</p>
-                                                <p className="font-bold text-[#1A1A2E]">Active</p>
-                                            </div>
-                                        </div>
-                                    </FloatingCard>
-                                </motion.div>
+                                        </FloatingCard>
+                                    </motion.div>
 
-                                {/* Bottom Left: Floating Testimonial */}
-                                <motion.div
-                                    style={{ translateZ: 80 }}
-                                    className="absolute -bottom-8 -left-4 lg:-left-12 animate-float-delayed z-20 max-w-[150px] lg:max-w-[200px]"
-                                >
-                                    <FloatingCard className="p-3 lg:p-4 bg-white/90 backdrop-blur shadow-2xl border border-white/50 rounded-2xl">
-                                        <p className="text-[10px] lg:text-xs text-gray-600 leading-tight italic">
-                                            "Transaction Secured. Biometric authentication active."
-                                        </p>
-                                        <div className="mt-2 flex gap-0.5">
-                                            {[1, 2, 3, 4, 5].map(i => (
-                                                <svg key={i} className="w-2 h-2 lg:w-3 lg:h-3 text-[#FFB800]" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" /></svg>
-                                            ))}
-                                        </div>
-                                    </FloatingCard>
+                                    {/* Bottom Left: Floating Testimonial */}
+                                    <motion.div
+                                        style={{ translateZ: 80 }}
+                                        className="absolute -bottom-8 -left-4 lg:-left-12 animate-float-delayed z-20 max-w-[150px] lg:max-w-[200px]"
+                                    >
+                                        <FloatingCard className="p-3 lg:p-4 bg-white/90 backdrop-blur shadow-2xl border border-white/50 rounded-2xl">
+                                            <p className="text-[10px] lg:text-xs text-gray-600 leading-tight italic">
+                                                "Transaction Secured. Biometric authentication active."
+                                            </p>
+                                            <div className="mt-2 flex gap-0.5">
+                                                {[1, 2, 3, 4, 5].map(i => (
+                                                    <svg key={i} className="w-2 h-2 lg:w-3 lg:h-3 text-[#FFB800]" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" /></svg>
+                                                ))}
+                                            </div>
+                                        </FloatingCard>
+                                    </motion.div>
                                 </motion.div>
-                            </motion.div>
-                        </AnimatePresence>
+                            </AnimatePresence>
+                        </div>
 
                         {/* PWA Download Button - Shifted under visual */}
                         <div className="absolute -bottom-8 lg:-bottom-16 w-full flex justify-center">

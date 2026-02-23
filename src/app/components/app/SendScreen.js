@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { startAuthentication } from "@simplewebauthn/browser";
 import {
+    backendDonate,
     getTransactions,
     getNonce,
     loginChallenge,
@@ -137,6 +138,8 @@ export default function SendScreen({
     const [amount, setAmount] = useState("0.00");
     const [isAnonymous, setIsAnonymous] = useState(forceAnonymousMode);
     const [isWhitelisting, setIsWhitelisting] = useState(false);
+    const [tipSenderName, setTipSenderName] = useState("Anonymous");
+    const [tipMessage, setTipMessage] = useState("");
 
     const [searchQuery, setSearchQuery] = useState("");
     const [recentRecipients, setRecentRecipients] = useState([]);
@@ -158,6 +161,19 @@ export default function SendScreen({
     const appliedPrefillKeyRef = useRef("");
 
     const anonymousMode = forceAnonymousMode || isAnonymous;
+    const isTipMode = Boolean(prefill?.tipMode && prefill?.recipient);
+    const effectiveShowRecipientSuggestions = showRecipientSuggestions && !isTipMode;
+    const headingTitle = isTipMode
+        ? `Tip ${prefill?.creatorName || "Creator"}`
+        : title;
+    const tipMinimumAmount = useMemo(() => {
+        if (!isTipMode) return 0;
+        const fromMin = Number(prefill?.tipMinAmount);
+        if (Number.isFinite(fromMin) && fromMin > 0) return fromMin;
+        const fromAmount = Number(prefill?.amount);
+        if (Number.isFinite(fromAmount) && fromAmount > 0) return fromAmount;
+        return 0;
+    }, [isTipMode, prefill?.amount, prefill?.tipMinAmount]);
     const parsedSearch = useMemo(() => parsePaymentRequest(searchQuery), [searchQuery]);
     const selectedRecipientAddress = selectedContact?.address || "";
     const walletAddress = user?.smartAccountId;
@@ -173,13 +189,20 @@ export default function SendScreen({
         }
     }, [forceAnonymousMode]);
 
+    useEffect(() => {
+        if (!isTipMode) return;
+        if (prefill?.defaultMessage) {
+            setTipMessage(String(prefill.defaultMessage).slice(0, 200));
+        }
+    }, [isTipMode, prefill?.defaultMessage]);
+
     const filteredRecipients = useMemo(() => {
         const query = searchQuery.trim().toLowerCase();
         if (!query) return recentRecipients;
         return recentRecipients.filter((contact) => contact.address.toLowerCase().includes(query));
     }, [recentRecipients, searchQuery]);
 
-    const applyRecipientSelection = (address, options = {}) => {
+    const applyRecipientSelection = useCallback((address, options = {}) => {
         const trimmed = String(address || "").trim();
         if (!trimmed) return;
 
@@ -193,10 +216,10 @@ export default function SendScreen({
         }
 
         setStep(2);
-    };
+    }, [recentRecipients]);
 
     useEffect(() => {
-        if (!showRecipientSuggestions) {
+        if (!effectiveShowRecipientSuggestions) {
             setRecentRecipients([]);
             setRecipientsError("");
             setIsLoadingRecipients(false);
@@ -245,17 +268,24 @@ export default function SendScreen({
         return () => {
             cancelled = true;
         };
-    }, [walletAddress, showRecipientSuggestions]);
+    }, [walletAddress, effectiveShowRecipientSuggestions]);
 
     useEffect(() => {
         if (!prefill) return;
-        const prefillKey = JSON.stringify({ recipient: prefill.recipient || "", amount: prefill.amount || "" });
+        const prefillKey = JSON.stringify({
+            recipient: prefill.recipient || "",
+            amount: prefill.amount || "",
+            tipMinAmount: prefill.tipMinAmount || "",
+            tipMode: Boolean(prefill.tipMode),
+            creatorName: prefill.creatorName || "",
+        });
         if (!prefillKey || prefillKey === appliedPrefillKeyRef.current) return;
         appliedPrefillKeyRef.current = prefillKey;
 
-        if (prefill.amount) setAmount(String(prefill.amount));
-        if (prefill.recipient) applyRecipientSelection(prefill.recipient, { prefillAmount: prefill.amount || "" });
-    }, [prefill, recentRecipients]);
+        const initialAmount = prefill.amount || prefill.tipMinAmount || "";
+        if (initialAmount) setAmount(String(initialAmount));
+        if (prefill.recipient) applyRecipientSelection(prefill.recipient, { prefillAmount: initialAmount });
+    }, [prefill, applyRecipientSelection]);
 
     const stopScanner = async () => {
         const instance = scannerInstanceRef.current;
@@ -351,6 +381,8 @@ export default function SendScreen({
         setSelectedContact(null);
         setSearchQuery("");
         setAmount("0.00");
+        setTipSenderName("Anonymous");
+        setTipMessage(prefill?.defaultMessage ? String(prefill.defaultMessage).slice(0, 200) : "");
         setPaymentReceipt(null);
         setProcessingError("");
         setProcessingStatus("");
@@ -421,6 +453,35 @@ export default function SendScreen({
         const rsSignature = derToRs(sigBytes);
         const signatureHex = bytesToHex(rsSignature);
 
+        if (isTipMode) {
+            setProcessingStatus("Submitting SuperChat donation...");
+            const donateRes = await backendDonate({
+                childId: walletAddress,
+                recipient: selectedRecipientAddress,
+                amount: amountInStroops,
+                signatureHex,
+                authData: credential.response.authenticatorData,
+                clientDataJSON: credential.response.clientDataJSON,
+                userId: user.userId,
+                senderName: String(tipSenderName || "Anonymous").trim() || "Anonymous",
+                message: String(tipMessage || "").slice(0, 200),
+            });
+
+            if (!donateRes?.success) {
+                throw new Error(donateRes?.error || `Donation failed${donateRes?.status ? ` (${donateRes.status})` : ""}`);
+            }
+
+            return {
+                mode: "tip",
+                amount: amountText,
+                recipient: selectedRecipientAddress,
+                txHash: donateRes.txHash || donateRes.hash || null,
+                status: donateRes.status || "SUCCESS",
+                localId: `tip_${Date.now().toString(36)}`,
+                message: "SuperChat sent successfully",
+            };
+        }
+
         setProcessingStatus("Submitting transfer to Stellar...");
         const transferRes = await transferUSDC({
             childId: walletAddress,
@@ -461,7 +522,13 @@ export default function SendScreen({
                 : await processStandardPayment(amountText);
 
             setPaymentReceipt(receipt);
-            setProcessingStatus(anonymousMode ? "Anonymous payment prepared" : "Payment sent successfully");
+            setProcessingStatus(
+                anonymousMode
+                    ? "Anonymous payment prepared"
+                    : isTipMode
+                        ? "SuperChat sent successfully"
+                        : "Payment sent successfully"
+            );
             setStep(4);
 
             if (!anonymousMode && onTransactionComplete) {
@@ -491,9 +558,9 @@ export default function SendScreen({
                                 </svg>
                                 <span>Home</span>
                                 <span>/</span>
-                                <span className="text-[#1A1A2E]">{title}</span>
+                                <span className="text-[#1A1A2E]">{headingTitle}</span>
                             </button>
-                            <h3 className="text-2xl font-black text-[#1A1A2E]">{title}</h3>
+                            <h3 className="text-2xl font-black text-[#1A1A2E]">{headingTitle}</h3>
                         </div>
 
                         <div className="relative group">
@@ -530,7 +597,7 @@ export default function SendScreen({
                             </button>
                         )}
 
-                        {showRecipientSuggestions ? (
+                        {effectiveShowRecipientSuggestions ? (
                             <div className="space-y-6 text-gray-400 font-bold text-xs uppercase tracking-widest">
                                 <p>Recent Recipients</p>
 
@@ -587,15 +654,20 @@ export default function SendScreen({
                 return (
                     <div className="space-y-8 animate-fade-in flex flex-col h-full">
                         <div className="text-center space-y-2">
-                            <p className="text-gray-400 text-sm font-bold">Sending to</p>
+                            <p className="text-gray-400 text-sm font-bold">{isTipMode ? "Sending SuperChat to" : "Sending to"}</p>
                             <div className="flex items-center justify-center gap-3 max-w-full">
                                 <div className={`w-10 h-10 rounded-full ${selectedContact?.color || "bg-gray-100 text-gray-500"} flex items-center justify-center text-xs font-black shrink-0`}>{selectedContact?.initial || "?"}</div>
                                 <span className="text-lg md:text-xl font-black text-[#1A1A2E] truncate" title={selectedRecipientAddress}>{shortAddress(selectedRecipientAddress, 10, 8)}</span>
-                                <button onClick={() => setStep(1)} className="text-gray-300 hover:text-red-500 transition-colors shrink-0">
-                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                                </button>
+                                {!isTipMode && (
+                                    <button onClick={() => setStep(1)} className="text-gray-300 hover:text-red-500 transition-colors shrink-0">
+                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                                    </button>
+                                )}
                             </div>
                             <p className="text-[10px] text-gray-400 font-mono break-all px-4">{selectedRecipientAddress}</p>
+                            {isTipMode && prefill?.creatorName && (
+                                <p className="text-xs font-semibold text-gray-500">Creator: {prefill.creatorName}</p>
+                            )}
                         </div>
 
                         <div className="text-center space-y-4">
@@ -615,7 +687,43 @@ export default function SendScreen({
                             ))}
                         </div>
 
-                        {!forceAnonymousMode && (
+                        {isTipMode && tipMinimumAmount > 0 && Number.isFinite(Number(amount)) && Number(amount) < tipMinimumAmount && (
+                            <div className="bg-[#FFF8E7] border border-[#FFE2A3] rounded-2xl p-3">
+                                <p className="text-xs font-semibold text-[#7A5200]">
+                                    This amount is below the minimum tip (${tipMinimumAmount.toFixed(2)}). Payment can still go through, but it won&apos;t be displayed as SuperChat.
+                                </p>
+                            </div>
+                        )}
+
+                        {isTipMode && (
+                            <div className="bg-white p-5 rounded-[2rem] border border-gray-100 space-y-4 shadow-sm">
+                                <div className="space-y-2">
+                                    <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400">Your Name</label>
+                                    <input
+                                        type="text"
+                                        maxLength={50}
+                                        value={tipSenderName}
+                                        onChange={(e) => setTipSenderName(e.target.value.slice(0, 50))}
+                                        placeholder="Anonymous"
+                                        className="w-full bg-[#F8F9FB] border border-gray-100 rounded-xl py-3 px-4 text-sm font-bold text-[#1A1A2E] outline-none"
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400">Message</label>
+                                    <textarea
+                                        rows={3}
+                                        maxLength={200}
+                                        value={tipMessage}
+                                        onChange={(e) => setTipMessage(e.target.value.slice(0, 200))}
+                                        placeholder="Write your SuperChat message..."
+                                        className="w-full bg-[#F8F9FB] border border-gray-100 rounded-xl py-3 px-4 text-sm font-semibold text-[#1A1A2E] outline-none resize-none"
+                                    />
+                                    <p className="text-right text-[10px] font-bold text-gray-400 uppercase tracking-widest">{tipMessage.length}/200</p>
+                                </div>
+                            </div>
+                        )}
+
+                        {!forceAnonymousMode && !isTipMode && (
                             <div className="bg-white p-6 rounded-[2.5rem] border border-gray-100 space-y-4 shadow-sm">
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-3">
@@ -656,9 +764,9 @@ export default function SendScreen({
                         )}
 
                         <div className="mt-auto grid grid-cols-2 gap-4">
-                            <button onClick={() => setStep(1)} className="py-5 bg-white border border-gray-100 rounded-3xl font-black text-[#1A1A2E] shadow-sm hover:shadow-lg transition-all">Back</button>
+                            <button onClick={() => (isTipMode ? onBack() : setStep(1))} className="py-5 bg-white border border-gray-100 rounded-3xl font-black text-[#1A1A2E] shadow-sm hover:shadow-lg transition-all">Back</button>
                             <button onClick={handleProcessPayment} className="py-5 bg-[#FFB800] rounded-3xl font-black text-[#1A1A2E] shadow-[0_10px_20px_-5px_rgba(255,184,0,0.4)] hover:scale-105 transition-all">
-                                {anonymousMode ? "Sign Anonymous Payment" : "Sign & Send"}
+                                {anonymousMode ? "Sign Anonymous Payment" : isTipMode ? "Send SuperChat" : "Sign & Send"}
                             </button>
                         </div>
                     </div>
@@ -707,9 +815,11 @@ export default function SendScreen({
                         </div>
 
                         <div className="space-y-3">
-                            <h3 className="text-4xl font-black text-[#1A1A2E]">{anonymousMode ? "Anonymous Payment Prepared" : "Payment Sent!"}</h3>
+                            <h3 className="text-4xl font-black text-[#1A1A2E]">
+                                {anonymousMode ? "Anonymous Payment Prepared" : isTipMode ? "SuperChat Sent!" : "Payment Sent!"}
+                            </h3>
                             <p className="text-gray-400 font-bold leading-relaxed text-lg px-2 break-all">
-                                <span className="text-[#1A1A2E]">${paymentReceipt?.amount || amount}</span> {anonymousMode ? "prepared for" : "sent to"} <span className="text-[#1A1A2E]">{shortAddress(paymentReceipt?.recipient || selectedRecipientAddress, 10, 8)}</span>
+                                <span className="text-[#1A1A2E]">${paymentReceipt?.amount || amount}</span> {anonymousMode ? "prepared for" : isTipMode ? "sent as tip to" : "sent to"} <span className="text-[#1A1A2E]">{shortAddress(paymentReceipt?.recipient || selectedRecipientAddress, 10, 8)}</span>
                             </p>
                         </div>
 

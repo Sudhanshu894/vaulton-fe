@@ -1,419 +1,582 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { motion } from "framer-motion";
+import { useEffect, useMemo, useState } from "react";
+import Image from "next/image";
+import {
+    backendGetCreatorDonations,
+    backendGetCreatorSettings,
+    backendUpdateCreatorSettings,
+} from "@/services/backendservices";
+import { buildVaultonTipLink, shortAddress } from "@/lib/paymentRequest";
 
-const quickAmounts = ["5", "10", "25", "50", "100"];
-const STREAMING_VISITED_KEY_PREFIX = "vaulton_streaming_seen_";
+const STROOPS_PER_USDC = 10_000_000;
+const DEFAULT_MIN_USDC = "1.00";
+const DEFAULT_DURATION_SECONDS = "5";
+const SETUP_SEEN_PREFIX = "vaulton_streaming_setup_done_";
 
-const getInitials = (name) => {
-    const safe = String(name || "JD").trim();
-    if (!safe) return "JD";
-    const parts = safe.split(/\s+/).filter(Boolean);
-    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-    return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+const formatUsdcFromStroops = (stroops) => {
+    const value = Number(stroops);
+    if (!Number.isFinite(value)) return "0.00";
+    return (value / STROOPS_PER_USDC).toLocaleString(undefined, {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+    });
 };
 
-function Toggle({ enabled, onToggle }) {
-    return (
-        <button
-            type="button"
-            onClick={onToggle}
-            className={`w-12 h-7 rounded-full transition-all duration-300 relative ${enabled ? "bg-emerald-500" : "bg-gray-300"}`}
-            aria-pressed={enabled}
-        >
-            <span className={`absolute top-1 w-5 h-5 bg-white rounded-full transition-all duration-300 ${enabled ? "left-6" : "left-1"}`} />
-        </button>
-    );
-}
+const parseSettings = (payload) => {
+    const raw = payload?.settings || payload?.data || payload || {};
+    const enabledRaw = raw.overlayEnabled ?? raw.donationEnabled ?? raw.enabled;
+    const minDonationRaw = raw.minDonationAmount ?? raw.minTipAmount ?? raw.minimumAmount;
+    const displayDurationRaw = raw.displayDuration ?? raw.durationMs ?? raw.displayTimeMs;
 
-function InfoCard({ title, value, icon, iconColor = "text-[#1A1A2E]" }) {
-    return (
-        <div className="bg-white border border-gray-200 rounded-2xl md:rounded-3xl p-4 md:p-5">
-            <div className="flex items-center gap-2 text-gray-500 text-xs md:text-sm font-bold">
-                <span className={iconColor}>{icon}</span>
-                {title}
-            </div>
-            <p className="mt-2 text-2xl md:text-4xl font-black tracking-tight text-[#1A1A2E]">{value}</p>
-        </div>
-    );
-}
+    return {
+        donationEnabled: enabledRaw == null ? true : Boolean(enabledRaw),
+        minDonationStroops: Number.isFinite(Number(minDonationRaw)) ? String(minDonationRaw) : String(STROOPS_PER_USDC),
+        displayDurationMs: Number.isFinite(Number(displayDurationRaw)) ? Number(displayDurationRaw) : 5000,
+    };
+};
+
+const parseDonations = (payload) => {
+    const items = payload?.donations || payload?.items || payload?.data || [];
+    return Array.isArray(items) ? items : [];
+};
+
+const formatTimestamp = (value) => {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "";
+    return date.toLocaleString();
+};
+
+const getCreatorSlug = (user) => {
+    const address = String(user?.smartAccountId || "").trim();
+    if (/^[GC][A-Z2-7]{20,}$/.test(address)) {
+        return address;
+    }
+
+    const source = user?.name || user?.userId || "creator";
+    return String(source)
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/-+/g, "-")
+        .replace(/^-|-$/g, "") || "creator";
+};
 
 export default function StreamingPartnershipHub({ onBack, user }) {
-    const [screen, setScreen] = useState(() => {
-        if (typeof window === "undefined") return "creator";
-        const key = `${STREAMING_VISITED_KEY_PREFIX}${user?.userId || "guest"}`;
-        const hasVisited = window.localStorage.getItem(key) === "1";
-        if (!hasVisited) {
-            window.localStorage.setItem(key, "1");
-        }
-        return hasVisited ? "hub" : "creator";
-    });
-    const [minimumTip, setMinimumTip] = useState("1");
-    const [acceptUsdc, setAcceptUsdc] = useState(true);
-    const [acceptXlm, setAcceptXlm] = useState(true);
+    const [isLoading, setIsLoading] = useState(true);
+    const [isSaving, setIsSaving] = useState(false);
+    const [loadError, setLoadError] = useState("");
+    const [saveError, setSaveError] = useState("");
+    const [saveSuccess, setSaveSuccess] = useState("");
     const [copyState, setCopyState] = useState("");
-    const [sendCurrency, setSendCurrency] = useState("USDC");
-    const [sendAmount, setSendAmount] = useState("0");
-    const [sendMessage, setSendMessage] = useState("");
-    const [sendStatus, setSendStatus] = useState("");
+    const [showTipQr, setShowTipQr] = useState(false);
+    const [tipQrDataUrl, setTipQrDataUrl] = useState("");
+    const [hasCompletedSetup, setHasCompletedSetup] = useState(false);
 
-    const creatorName = user?.name || "John Doe";
-    const creatorSlug = useMemo(() => {
-        const source = user?.userId || creatorName || "johndoe";
-        return String(source).toLowerCase().replace(/[^a-z0-9]+/g, "");
-    }, [creatorName, user?.userId]);
-    const initials = getInitials(creatorName);
-    const tipLink = `https://vaulton.app/tip/${creatorSlug || "johndoe"}`;
-    const overlayLink = `https://vaulton.app/overlay/${creatorSlug || "johndoe"}`;
+    const [donationEnabled, setDonationEnabled] = useState(true);
+    const [minTipUsdc, setMinTipUsdc] = useState(DEFAULT_MIN_USDC);
+    const [displayDurationSeconds, setDisplayDurationSeconds] = useState(DEFAULT_DURATION_SECONDS);
+    const [donations, setDonations] = useState([]);
+
+    const creatorSlug = useMemo(() => getCreatorSlug(user), [user]);
+    const setupSeenKey = useMemo(
+        () => `${SETUP_SEEN_PREFIX}${user?.userId || "guest"}`,
+        [user?.userId]
+    );
+    const creatorAddress = user?.smartAccountId || "";
+    const creatorName = user?.name || "Creator";
+    const origin = typeof window !== "undefined" ? window.location.origin : "";
+
+    const tipLink = useMemo(() => {
+        if (!creatorAddress || !origin) return "";
+        const minimum = Number(minTipUsdc);
+        const minimumAmount = Number.isFinite(minimum) && minimum > 0 ? minimum.toFixed(2) : "";
+        return buildVaultonTipLink({
+            origin,
+            slug: creatorSlug,
+            recipient: creatorAddress,
+            amount: minimumAmount,
+            minAmount: minimumAmount,
+            creatorName,
+        });
+    }, [creatorAddress, creatorName, creatorSlug, minTipUsdc, origin]);
+
+    const overlayLink = useMemo(() => {
+        if (!creatorAddress || !origin) return "";
+        return `${origin}/overlay?address=${encodeURIComponent(creatorAddress)}`;
+    }, [creatorAddress, origin]);
+
+    const stats = useMemo(() => {
+        const totalStroops = donations.reduce((sum, item) => sum + (Number(item?.amount) || 0), 0);
+        const totalMessages = donations.length;
+        const avgStroops = totalMessages > 0 ? totalStroops / totalMessages : 0;
+        return {
+            totalUsdc: formatUsdcFromStroops(totalStroops),
+            totalMessages,
+            avgUsdc: formatUsdcFromStroops(avgStroops),
+        };
+    }, [donations]);
+
+    useEffect(() => {
+        if (typeof window === "undefined") return;
+        setHasCompletedSetup(window.localStorage.getItem(setupSeenKey) === "1");
+    }, [setupSeenKey]);
+
+    useEffect(() => {
+        if (!user?.userId) {
+            setDonations([]);
+            setIsLoading(false);
+            return;
+        }
+
+        let cancelled = false;
+        setIsLoading(true);
+        setLoadError("");
+
+        (async () => {
+            try {
+                const [settingsData, donationsData] = await Promise.all([
+                    backendGetCreatorSettings(user.userId),
+                    backendGetCreatorDonations(user.userId),
+                ]);
+                if (cancelled) return;
+
+                const parsedSettings = parseSettings(settingsData);
+                const minUsdc = Number(parsedSettings.minDonationStroops) / STROOPS_PER_USDC;
+                const rawDuration = Number(parsedSettings.displayDurationMs || 0);
+                const durationSeconds = Math.max(1, Math.round(rawDuration > 1000 ? rawDuration / 1000 : rawDuration));
+                setDonationEnabled(parsedSettings.donationEnabled);
+                setMinTipUsdc(
+                    Number.isFinite(minUsdc) && minUsdc > 0
+                        ? minUsdc.toFixed(2)
+                        : DEFAULT_MIN_USDC
+                );
+                setDisplayDurationSeconds(String(durationSeconds || Number(DEFAULT_DURATION_SECONDS)));
+                setDonations(parseDonations(donationsData));
+            } catch (error) {
+                console.error("Failed to load streaming partnership data", error);
+                if (!cancelled) {
+                    setLoadError(error?.response?.data?.error || "Failed to load creator settings");
+                    setDonations([]);
+                }
+            } finally {
+                if (!cancelled) setIsLoading(false);
+            }
+        })();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [user?.userId]);
+
+    useEffect(() => {
+        let cancelled = false;
+        if (!showTipQr || !tipLink) {
+            setTipQrDataUrl("");
+            return;
+        }
+
+        (async () => {
+            try {
+                const qrcode = await import("qrcode");
+                const dataUrl = await qrcode.toDataURL(tipLink, {
+                    errorCorrectionLevel: "M",
+                    margin: 1,
+                    width: 240,
+                    color: { dark: "#111827", light: "#FFFFFF" },
+                });
+                if (!cancelled) setTipQrDataUrl(dataUrl);
+            } catch (error) {
+                console.error("Failed to generate tip link QR", error);
+                if (!cancelled) setTipQrDataUrl("");
+            }
+        })();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [showTipQr, tipLink]);
 
     const handleCopy = async (text, key) => {
+        if (!text) return;
         try {
             await navigator.clipboard.writeText(text);
             setCopyState(key);
             setTimeout(() => setCopyState(""), 1200);
-        } catch (e) {
-            console.error("Failed to copy", e);
+        } catch (error) {
+            console.error("Copy failed", error);
         }
     };
 
-    const handleSend = () => {
-        const n = Number(sendAmount);
-        if (!Number.isFinite(n) || n <= 0) return;
-        setSendStatus(`SuperChat sent to ${creatorName} (frontend simulation).`);
-        setTimeout(() => setSendStatus(""), 2400);
+    const handleSaveSettings = async () => {
+        if (!user?.userId) {
+            setSaveError("Missing user session");
+            return;
+        }
+
+        setSaveError("");
+        setSaveSuccess("");
+
+        const rawMin = Number(String(minTipUsdc || "").trim());
+        const rawDurationSeconds = Number(String(displayDurationSeconds || "").trim());
+
+        if (donationEnabled && (!Number.isFinite(rawMin) || rawMin <= 0)) {
+            setSaveError("Minimum SuperChat amount must be greater than 0");
+            return;
+        }
+        if (donationEnabled && (!Number.isFinite(rawDurationSeconds) || rawDurationSeconds <= 0)) {
+            setSaveError("Display duration must be greater than 0 seconds");
+            return;
+        }
+
+        const minValue = Number.isFinite(rawMin) && rawMin > 0 ? rawMin : Number(DEFAULT_MIN_USDC);
+        const durationSeconds = Number.isFinite(rawDurationSeconds) && rawDurationSeconds > 0
+            ? rawDurationSeconds
+            : Number(DEFAULT_DURATION_SECONDS);
+
+        const minDonationAmount = String(Math.round(minValue * STROOPS_PER_USDC));
+        const payload = {
+            overlayEnabled: donationEnabled,
+            minDonationAmount,
+            displayDuration: Math.round(durationSeconds * 1000),
+        };
+
+        setIsSaving(true);
+        try {
+            const response = await backendUpdateCreatorSettings(user.userId, payload);
+            if (!response?.success && response?.error) {
+                throw new Error(response.error);
+            }
+            if (typeof window !== "undefined") {
+                window.localStorage.setItem(setupSeenKey, "1");
+            }
+            setHasCompletedSetup(true);
+            setSaveSuccess("Settings saved");
+            setTimeout(() => setSaveSuccess(""), 1400);
+        } catch (error) {
+            console.error("Failed to save creator settings", error);
+            setSaveError(error?.response?.data?.error || error?.message || "Failed to save settings");
+        } finally {
+            setIsSaving(false);
+        }
     };
 
-    if (screen === "creator") {
+    if (!user?.userId) {
         return (
-            <div className="space-y-4 md:space-y-7 animate-fade-in pb-20 md:pb-24">
-                <button onClick={() => setScreen("hub")} className="text-sm md:text-2xl font-black text-gray-500 flex items-center gap-2 md:gap-3 hover:text-[#1A1A2E]">
-                    <span>←</span> Back to SuperChat
+            <div className="space-y-5 pb-24">
+                <button onClick={onBack} className="inline-flex items-center gap-2 text-sm font-bold text-gray-500 hover:text-[#1A1A2E]">
+                    <span>←</span> Back to Add-ons
                 </button>
-
-                <div className="flex items-start md:items-center gap-3 md:gap-4">
-                    <div className="w-10 h-10 md:w-14 md:h-14 bg-[#FFB800] rounded-xl md:rounded-2xl flex items-center justify-center text-[#1A1A2E]">
-                        <svg className="w-5 h-5 md:w-7 md:h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
-                        </svg>
-                    </div>
-                    <div>
-                        <h3 className="text-2xl md:text-5xl font-black tracking-tight text-[#1A1A2E]">Creator Setup</h3>
-                        <p className="text-sm md:text-2xl text-gray-500 font-bold">Manage your SuperChat links and settings</p>
-                    </div>
+                <div className="bg-white border border-dashed border-gray-200 rounded-3xl p-8 text-center">
+                    <p className="text-lg font-black text-[#1A1A2E]">Log in to manage Streaming Partnership</p>
                 </div>
-
-                <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
-                    <InfoCard
-                        title="Total Earned"
-                        value="--"
-                        icon={<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-3.2 0-5.5 1.4-5.5 3.2 0 1.9 2.3 3.3 5.5 3.3 3 0 5.5 1.3 5.5 3.2 0 1.8-2.5 3.3-5.5 3.3m0-13V5m0 16v-2" /></svg>}
-                        iconColor="text-amber-500"
-                    />
-                    <InfoCard
-                        title="Messages"
-                        value="--"
-                        icon={<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h8M8 14h4m8 5l-4-4H7a3 3 0 01-3-3V6a3 3 0 013-3h10a3 3 0 013 3v13z" /></svg>}
-                        iconColor="text-blue-500"
-                    />
-                    <InfoCard
-                        title="Avg Tip"
-                        value="--"
-                        icon={<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 17l4-4 4 4 5-6" /></svg>}
-                        iconColor="text-emerald-500"
-                    />
-                    <InfoCard
-                        title="Status"
-                        value="Active"
-                        icon={<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>}
-                        iconColor="text-emerald-500"
-                    />
-                </div>
-
-                <div className="bg-white border border-gray-200 rounded-2xl md:rounded-3xl p-4 md:p-6 space-y-4 md:space-y-5">
-                    <div className="flex items-start gap-3">
-                        <div className="w-10 h-10 md:w-11 md:h-11 rounded-full bg-amber-50 text-amber-500 flex items-center justify-center shrink-0">
-                            <svg className="w-4 h-4 md:w-5 md:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l3-3m0 0l-3-3m3 3H3m17 0a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                        </div>
-                        <div>
-                            <h4 className="text-xl md:text-4xl font-black text-[#1A1A2E] tracking-tight">Tip Link</h4>
-                            <p className="text-sm md:text-xl text-gray-500 font-bold">Paste this in your social media bio or stream description</p>
-                        </div>
-                    </div>
-
-                    <div className="flex flex-col sm:flex-row gap-3">
-                        <input readOnly value={tipLink} className="w-full flex-1 rounded-xl md:rounded-2xl bg-[#F2F5F9] px-3 md:px-4 py-3 md:py-4 text-xs sm:text-sm md:text-2xl font-mono font-bold text-[#1A1A2E] outline-none" />
-                        <button onClick={() => handleCopy(tipLink, "tip")} className="w-full sm:w-auto px-5 md:px-7 py-3 md:py-4 rounded-xl md:rounded-2xl bg-[#FFB800] text-[#1A1A2E] font-black text-base md:text-2xl">
-                            {copyState === "tip" ? "Copied" : "Copy"}
-                        </button>
-                    </div>
-
-                    <div className="flex flex-wrap gap-2">
-                        {["YouTube", "Twitch", "Twitter/X", "Instagram"].map((item) => (
-                            <span key={item} className="px-3 md:px-4 py-1.5 md:py-2 rounded-full bg-[#F2F5F9] text-gray-500 font-bold text-xs sm:text-sm md:text-xl">{item}</span>
-                        ))}
-                    </div>
-                </div>
-
-                <div className="bg-white border border-gray-200 rounded-2xl md:rounded-3xl p-4 md:p-6 space-y-4 md:space-y-5">
-                    <div className="flex items-start gap-3">
-                        <div className="w-10 h-10 md:w-11 md:h-11 rounded-full bg-purple-50 text-purple-500 flex items-center justify-center shrink-0">
-                            <svg className="w-4 h-4 md:w-5 md:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14m-6 4H5a2 2 0 01-2-2V8a2 2 0 012-2h4m6 12h4a2 2 0 002-2V8a2 2 0 00-2-2h-4m0 12V6m0 12H9m6 0H9" />
-                            </svg>
-                        </div>
-                        <div>
-                            <h4 className="text-xl md:text-4xl font-black text-[#1A1A2E] tracking-tight">Stream Overlay Link</h4>
-                            <p className="text-sm md:text-xl text-gray-500 font-bold">Add as Browser Source in OBS / Streamlabs</p>
-                        </div>
-                    </div>
-
-                    <div className="flex flex-col sm:flex-row gap-3">
-                        <input readOnly value={overlayLink} className="w-full flex-1 rounded-xl md:rounded-2xl bg-[#F2F5F9] px-3 md:px-4 py-3 md:py-4 text-xs sm:text-sm md:text-2xl font-mono font-bold text-[#1A1A2E] outline-none" />
-                        <button onClick={() => handleCopy(overlayLink, "overlay")} className="w-full sm:w-auto px-5 md:px-7 py-3 md:py-4 rounded-xl md:rounded-2xl bg-purple-500 text-white font-black text-base md:text-2xl">
-                            {copyState === "overlay" ? "Copied" : "Copy"}
-                        </button>
-                    </div>
-
-                    <div className="rounded-xl md:rounded-2xl bg-purple-50 border border-purple-100 px-3 md:px-4 py-3 text-xs md:text-lg font-semibold text-gray-500">
-                        In OBS: Sources → Add → Browser → paste this URL. Set width to 400px and height to 600px. SuperChats will animate on screen during your stream.
-                    </div>
-                </div>
-
-                <div className="bg-white border border-gray-200 rounded-2xl md:rounded-3xl p-4 md:p-6 space-y-3 md:space-y-4">
-                    <h4 className="text-xl md:text-4xl font-black tracking-tight text-[#1A1A2E]">SuperChat Settings</h4>
-
-                    <div className="rounded-xl md:rounded-2xl bg-[#F2F5F9] px-4 md:px-5 py-3 md:py-4 flex flex-col sm:flex-row sm:items-center gap-3 sm:justify-between">
-                        <div>
-                            <p className="text-base md:text-3xl font-black text-[#1A1A2E]">Minimum Tip Amount</p>
-                            <p className="text-xs md:text-xl text-gray-500 font-bold">Set the minimum amount viewers can send</p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <span className="text-xl md:text-3xl font-black text-[#1A1A2E]">$</span>
-                            <input
-                                value={minimumTip}
-                                onChange={(e) => setMinimumTip(e.target.value.replace(/[^\d.]/g, ""))}
-                                className="w-16 md:w-20 text-right bg-transparent text-xl md:text-3xl font-black text-[#1A1A2E] outline-none"
-                            />
-                        </div>
-                    </div>
-
-                    <div className="rounded-xl md:rounded-2xl bg-[#F2F5F9] px-4 md:px-5 py-3 md:py-4 flex items-center justify-between gap-3">
-                        <div>
-                            <p className="text-base md:text-3xl font-black text-[#1A1A2E]">Accept USDC</p>
-                            <p className="text-xs md:text-xl text-gray-500 font-bold">Allow tips in USDC stablecoin</p>
-                        </div>
-                        <Toggle enabled={acceptUsdc} onToggle={() => setAcceptUsdc((v) => !v)} />
-                    </div>
-
-                    <div className="rounded-xl md:rounded-2xl bg-[#F2F5F9] px-4 md:px-5 py-3 md:py-4 flex items-center justify-between gap-3">
-                        <div>
-                            <p className="text-base md:text-3xl font-black text-[#1A1A2E]">Accept XLM</p>
-                            <p className="text-xs md:text-xl text-gray-500 font-bold">Allow tips in Stellar Lumens</p>
-                        </div>
-                        <Toggle enabled={acceptXlm} onToggle={() => setAcceptXlm((v) => !v)} />
-                    </div>
-                </div>
-            </div>
-        );
-    }
-
-    if (screen === "sender") {
-        return (
-            <div className="space-y-4 md:space-y-6 animate-fade-in pb-20 md:pb-24 max-w-4xl mx-auto">
-                <button onClick={() => setScreen("hub")} className="text-sm md:text-xl font-black text-gray-500 flex items-center gap-2 hover:text-[#1A1A2E]">
-                    <span>←</span> Back to SuperChat
-                </button>
-
-                <div className="flex flex-col items-center text-center gap-3 md:gap-4">
-                    <div className="w-16 h-16 md:w-24 md:h-24 rounded-full bg-[#1A1A2E] text-white text-2xl md:text-4xl font-black flex items-center justify-center">
-                        {initials}
-                    </div>
-                    <h3 className="text-2xl md:text-5xl font-black tracking-tight text-[#1A1A2E]">Send SuperChat to {creatorName}</h3>
-                    <p className="text-base md:text-2xl text-gray-500 font-bold">Your message will appear on their stream</p>
-                </div>
-
-                <div className="text-center">
-                    <div className="inline-flex items-center gap-2 md:gap-3 text-5xl md:text-8xl font-black text-gray-500">
-                        <span className="text-3xl md:text-6xl text-gray-500">$</span>
-                        <input
-                            value={sendAmount}
-                            onChange={(e) => setSendAmount(e.target.value.replace(/[^\d.]/g, ""))}
-                            className="w-28 md:w-56 text-center bg-transparent outline-none text-[#1A1A2E]"
-                        />
-                    </div>
-                </div>
-
-                <div className="flex justify-center gap-2 flex-wrap">
-                    {["USDC", "XLM"].map((token) => (
-                        <button
-                            key={token}
-                            onClick={() => setSendCurrency(token)}
-                            className={`px-5 md:px-8 py-2.5 md:py-3 rounded-2xl md:rounded-3xl text-base md:text-3xl font-black border ${sendCurrency === token ? "bg-amber-50 border-amber-200 text-amber-500" : "bg-[#F2F5F9] border-gray-200 text-gray-500"}`}
-                        >
-                            {token}
-                        </button>
-                    ))}
-                </div>
-
-                <div className="flex justify-center gap-2 flex-wrap">
-                    {quickAmounts.map((value) => (
-                        <button
-                            key={value}
-                            onClick={() => setSendAmount(value)}
-                            className="px-4 md:px-5 py-2.5 md:py-3 rounded-2xl md:rounded-3xl bg-[#F2F5F9] border border-gray-200 text-base md:text-3xl font-black text-[#1A1A2E]"
-                        >
-                            ${value}
-                        </button>
-                    ))}
-                </div>
-
-                <div className="space-y-2">
-                    <textarea
-                        value={sendMessage}
-                        onChange={(e) => setSendMessage(e.target.value.slice(0, 200))}
-                        placeholder="Write your message..."
-                        className="w-full h-36 md:h-56 rounded-2xl md:rounded-3xl bg-[#F2F5F9] border border-gray-200 text-lg md:text-4xl px-4 md:px-6 py-4 md:py-6 text-[#1A1A2E] placeholder:text-gray-400 font-medium outline-none resize-none"
-                    />
-                    <p className="text-right text-sm md:text-3xl font-bold text-gray-500">{sendMessage.length}/200</p>
-                </div>
-
-                <button
-                    onClick={handleSend}
-                    disabled={!Number(sendAmount)}
-                    className="w-full py-3.5 md:py-5 rounded-2xl md:rounded-3xl bg-[#F5DCAB] text-[#1A1A2E] text-xl md:text-4xl font-black disabled:opacity-60"
-                >
-                    ⚡ Send SuperChat
-                </button>
-
-                {sendStatus && (
-                    <motion.div
-                        initial={{ opacity: 0, y: 8 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="rounded-xl md:rounded-2xl bg-emerald-50 border border-emerald-100 text-emerald-700 p-3 md:p-4 text-sm md:text-lg font-bold text-center"
-                    >
-                        {sendStatus}
-                    </motion.div>
-                )}
             </div>
         );
     }
 
     return (
-        <div className="space-y-5 md:space-y-8 animate-fade-in pb-20 md:pb-24">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <button onClick={onBack} className="text-sm md:text-2xl font-black text-gray-500 flex items-center gap-2 md:gap-3 hover:text-[#1A1A2E]">
-                    <span>←</span> Back to Add-ons
+        <div className="space-y-6 md:space-y-7 animate-fade-in pb-24">
+            <div className="space-y-2">
+                <button onClick={onBack} className="inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-gray-400 hover:text-[#1A1A2E] transition-colors">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                    </svg>
+                    <span>Add-ons</span>
+                    <span>/</span>
+                    <span className="text-[#1A1A2E]">Streaming Partnership</span>
                 </button>
-                <div className="text-left sm:text-right">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Add-on</p>
-                    <h2 className="text-lg sm:text-xl md:text-3xl font-black tracking-tight text-[#1A1A2E]">Streaming Partnership</h2>
-                </div>
+                <h2 className="text-2xl md:text-3xl font-black text-[#1A1A2E]">Streaming Partnership</h2>
+                <p className="text-sm text-gray-500 font-semibold">Creator tools for SuperChat links and stream overlays</p>
             </div>
 
-            <div className="grid xl:grid-cols-2 gap-4 md:gap-5">
-                <div className="relative overflow-hidden rounded-[1.75rem] md:rounded-[2.5rem] p-4 md:p-8 bg-gradient-to-br from-[#1A2438] via-[#2C3A52] to-[#31435F] text-white shadow-sm">
-                    <div className="absolute top-0 right-0 w-28 h-28 md:w-40 md:h-40 bg-amber-200/20 rounded-full -translate-y-1/2 translate-x-1/2" />
-                    <div className="space-y-4 md:space-y-5 relative z-10">
-                        <div className="flex items-start md:items-center gap-3 md:gap-4">
-                            <div className="w-10 h-10 md:w-14 md:h-14 rounded-xl md:rounded-2xl bg-amber-400/20 text-amber-300 flex items-center justify-center">
-                                <svg className="w-5 h-5 md:w-7 md:h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
-                                </svg>
-                            </div>
+            {isLoading ? (
+                <div className="bg-white border border-gray-100 rounded-3xl p-8 text-center">
+                    <div className="w-7 h-7 mx-auto border-4 border-[#FFB800]/25 border-t-[#FFB800] rounded-full animate-spin" />
+                    <p className="mt-3 text-sm font-semibold text-gray-500">Loading creator dashboard...</p>
+                </div>
+            ) : !hasCompletedSetup ? (
+                <div className="bg-white border border-gray-100 rounded-3xl p-5 md:p-6 space-y-5">
+                    <div>
+                        <h3 className="text-xl font-black text-[#1A1A2E]">Creator Setup</h3>
+                        <p className="text-sm text-gray-500 font-semibold mt-1">Set your donation rules once, then manage everything from dashboard.</p>
+                    </div>
+
+                    <div className="space-y-4">
+                        <div className="bg-[#F8F9FB] border border-gray-100 rounded-2xl p-4 flex items-center justify-between gap-3">
                             <div>
-                                <h3 className="text-2xl md:text-4xl font-black tracking-tight">Creator Mode</h3>
-                                <p className="text-sm md:text-2xl text-blue-100 font-bold">Set up SuperChat for your streams</p>
+                                <p className="text-sm font-black text-[#1A1A2E]">Enable SuperChat Donations</p>
+                                <p className="text-xs text-gray-500 font-semibold">Allow viewers to send highlighted donations</p>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setDonationEnabled((v) => !v)}
+                                className={`w-12 h-7 rounded-full transition-all relative ${donationEnabled ? "bg-emerald-500" : "bg-gray-300"}`}
+                            >
+                                <span className={`absolute top-1 w-5 h-5 bg-white rounded-full transition-all ${donationEnabled ? "left-6" : "left-1"}`} />
+                            </button>
+                        </div>
+
+                        <div className="grid sm:grid-cols-2 gap-3">
+                            <div className="bg-[#F8F9FB] border border-gray-100 rounded-2xl p-4 space-y-2">
+                                <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Minimum SuperChat (USDC)</p>
+                                <input
+                                    disabled={!donationEnabled}
+                                    value={minTipUsdc}
+                                    onChange={(e) => setMinTipUsdc(e.target.value.replace(/[^\d.]/g, ""))}
+                                    className={`w-full bg-white border border-gray-100 rounded-xl px-3 py-2.5 text-sm font-bold text-[#1A1A2E] outline-none ${!donationEnabled ? "opacity-60 cursor-not-allowed" : ""}`}
+                                    placeholder="1.00"
+                                />
+                            </div>
+                            <div className="bg-[#F8F9FB] border border-gray-100 rounded-2xl p-4 space-y-2">
+                                <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Display Time (seconds)</p>
+                                <input
+                                    disabled={!donationEnabled}
+                                    value={displayDurationSeconds}
+                                    onChange={(e) => setDisplayDurationSeconds(e.target.value.replace(/[^\d]/g, ""))}
+                                    className={`w-full bg-white border border-gray-100 rounded-xl px-3 py-2.5 text-sm font-bold text-[#1A1A2E] outline-none ${!donationEnabled ? "opacity-60 cursor-not-allowed" : ""}`}
+                                    placeholder="5"
+                                />
+                            </div>
+                        </div>
+                    </div>
+
+                    {(loadError || saveError || saveSuccess) && (
+                        <p className={`text-sm font-semibold ${saveSuccess ? "text-emerald-600" : "text-red-500"}`}>
+                            {saveSuccess || saveError || loadError}
+                        </p>
+                    )}
+
+                    <button
+                        type="button"
+                        onClick={handleSaveSettings}
+                        disabled={isSaving}
+                        className="w-full py-3 rounded-2xl bg-[#FFB800] text-[#1A1A2E] font-black text-sm disabled:opacity-60"
+                    >
+                        {isSaving ? "Saving..." : "Save Setup & Continue"}
+                    </button>
+                </div>
+            ) : (
+                <>
+                    <div className="grid sm:grid-cols-2 xl:grid-cols-4 gap-3">
+                        <div className="bg-white border border-gray-100 rounded-2xl p-4">
+                            <p className="text-xs font-bold text-gray-500">Total Received</p>
+                            <p className="text-2xl font-black text-[#1A1A2E] mt-1">${stats.totalUsdc}</p>
+                        </div>
+                        <div className="bg-white border border-gray-100 rounded-2xl p-4">
+                            <p className="text-xs font-bold text-gray-500">Messages</p>
+                            <p className="text-2xl font-black text-[#1A1A2E] mt-1">{stats.totalMessages}</p>
+                        </div>
+                        <div className="bg-white border border-gray-100 rounded-2xl p-4">
+                            <p className="text-xs font-bold text-gray-500">Avg Tip</p>
+                            <p className="text-2xl font-black text-[#1A1A2E] mt-1">${stats.avgUsdc}</p>
+                        </div>
+                        <div className="bg-white border border-gray-100 rounded-2xl p-4">
+                            <p className="text-xs font-bold text-gray-500">Status</p>
+                            <p className={`text-2xl font-black mt-1 ${donationEnabled ? "text-emerald-600" : "text-gray-500"}`}>
+                                {donationEnabled ? "Active" : "Disabled"}
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="bg-white border border-gray-100 rounded-3xl p-5 md:p-6">
+                        <div className="grid lg:grid-cols-2 gap-4">
+                            <div className="bg-[#F8F9FB] border border-gray-100 rounded-2xl p-4 space-y-3">
+                                <div className="flex items-center justify-between gap-2">
+                                    <div>
+                                        <h3 className="text-base font-black text-[#1A1A2E]">Tip Link</h3>
+                                        <p className="text-xs text-gray-500 font-semibold">Viewers open this to send SuperChats to your creator address.</p>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            onClick={() => handleCopy(tipLink, "tip")}
+                                            className={`w-9 h-9 rounded-xl border flex items-center justify-center ${copyState === "tip" ? "bg-emerald-50 border-emerald-200 text-emerald-600" : "bg-white border-gray-100 text-[#1A1A2E]"}`}
+                                            title={copyState === "tip" ? "Copied" : "Copy tip link"}
+                                        >
+                                            {copyState === "tip" ? (
+                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                                                </svg>
+                                            ) : (
+                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                                </svg>
+                                            )}
+                                        </button>
+                                        <button
+                                            onClick={() => setShowTipQr((v) => !v)}
+                                            className={`w-9 h-9 rounded-xl border flex items-center justify-center ${showTipQr ? "bg-[#FFB800]/15 border-[#FFB800]/40 text-[#B7791F]" : "bg-white border-gray-100 text-[#1A1A2E]"}`}
+                                            title={showTipQr ? "Hide QR" : "Show QR"}
+                                        >
+                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div className="bg-white border border-gray-100 rounded-xl p-3 text-xs font-mono text-[#1A1A2E] break-all">
+                                    {tipLink || "Tip link unavailable"}
+                                </div>
+
+                                {showTipQr && (
+                                    <div className="grid sm:grid-cols-[180px_1fr] gap-3 items-start">
+                                        <div className="rounded-xl bg-white border border-gray-100 p-2.5">
+                                            {tipQrDataUrl ? (
+                                                <Image
+                                                    src={tipQrDataUrl}
+                                                    alt="Tip link QR"
+                                                    width={180}
+                                                    height={180}
+                                                    unoptimized
+                                                    className="w-full h-auto rounded-lg bg-white"
+                                                />
+                                            ) : (
+                                                <div className="aspect-square rounded-lg bg-white flex items-center justify-center text-xs text-gray-400 font-semibold">
+                                                    Generating QR...
+                                                </div>
+                                            )}
+                                        </div>
+                                        <p className="text-xs text-gray-500 font-semibold">
+                                            Display this QR on stream so viewers can scan and open your tip link instantly.
+                                        </p>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="bg-[#F8F9FB] border border-gray-100 rounded-2xl p-4 space-y-3">
+                                <div className="flex items-center justify-between gap-2">
+                                    <div>
+                                        <h3 className="text-base font-black text-[#1A1A2E]">Streaming Overlay Link</h3>
+                                        <p className="text-xs text-gray-500 font-semibold">Use this browser-source link in OBS/Streamlabs to show live SuperChats.</p>
+                                    </div>
+                                    <button
+                                        onClick={() => handleCopy(overlayLink, "overlay")}
+                                        className={`w-9 h-9 rounded-xl border flex items-center justify-center ${copyState === "overlay" ? "bg-emerald-50 border-emerald-200 text-emerald-600" : "bg-white border-gray-100 text-[#1A1A2E]"}`}
+                                        title={copyState === "overlay" ? "Copied" : "Copy streaming link"}
+                                    >
+                                        {copyState === "overlay" ? (
+                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                                            </svg>
+                                        ) : (
+                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                            </svg>
+                                        )}
+                                    </button>
+                                </div>
+                                <div className="bg-white border border-gray-100 rounded-xl p-3 text-xs font-mono text-[#1A1A2E] break-all">
+                                    {overlayLink || "Streaming link unavailable"}
+                                </div>
+                                <p className="text-xs text-gray-500 font-semibold">
+                                    In OBS: add a Browser source and paste this link.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="bg-white border border-gray-100 rounded-3xl p-5 md:p-6 space-y-4">
+                        <h3 className="text-lg font-black text-[#1A1A2E]">Creator Settings</h3>
+                        <div className="bg-[#F8F9FB] border border-gray-100 rounded-2xl p-4 flex items-center justify-between gap-3">
+                            <div>
+                                <p className="text-sm font-black text-[#1A1A2E]">Enable Donations</p>
+                                <p className="text-xs text-gray-500 font-semibold">Turn SuperChat receiving on/off</p>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setDonationEnabled((v) => !v)}
+                                className={`w-12 h-7 rounded-full transition-all relative ${donationEnabled ? "bg-emerald-500" : "bg-gray-300"}`}
+                            >
+                                <span className={`absolute top-1 w-5 h-5 bg-white rounded-full transition-all ${donationEnabled ? "left-6" : "left-1"}`} />
+                            </button>
+                        </div>
+
+                        <div className="grid sm:grid-cols-2 gap-3">
+                            <div className="bg-[#F8F9FB] border border-gray-100 rounded-2xl p-4 space-y-2">
+                                <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Minimum SuperChat (USDC)</p>
+                                <input
+                                    disabled={!donationEnabled}
+                                    value={minTipUsdc}
+                                    onChange={(e) => setMinTipUsdc(e.target.value.replace(/[^\d.]/g, ""))}
+                                    className={`w-full bg-white border border-gray-100 rounded-xl px-3 py-2.5 text-sm font-bold text-[#1A1A2E] outline-none ${!donationEnabled ? "opacity-60 cursor-not-allowed" : ""}`}
+                                />
+                            </div>
+                            <div className="bg-[#F8F9FB] border border-gray-100 rounded-2xl p-4 space-y-2">
+                                <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Display Time (seconds)</p>
+                                <input
+                                    disabled={!donationEnabled}
+                                    value={displayDurationSeconds}
+                                    onChange={(e) => setDisplayDurationSeconds(e.target.value.replace(/[^\d]/g, ""))}
+                                    className={`w-full bg-white border border-gray-100 rounded-xl px-3 py-2.5 text-sm font-bold text-[#1A1A2E] outline-none ${!donationEnabled ? "opacity-60 cursor-not-allowed" : ""}`}
+                                />
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-3">
-                            <div className="bg-white/10 rounded-2xl md:rounded-3xl p-3 md:p-4">
-                                <p className="text-xs md:text-xl text-blue-100 font-bold">Total Earned</p>
-                                <p className="text-3xl md:text-6xl font-black tracking-tight">--</p>
-                            </div>
-                            <div className="bg-white/10 rounded-2xl md:rounded-3xl p-3 md:p-4">
-                                <p className="text-xs md:text-xl text-blue-100 font-bold">Messages</p>
-                                <p className="text-3xl md:text-6xl font-black tracking-tight">--</p>
-                            </div>
-                        </div>
+                        {(loadError || saveError || saveSuccess) && (
+                            <p className={`text-sm font-semibold ${saveSuccess ? "text-emerald-600" : "text-red-500"}`}>
+                                {saveSuccess || saveError || loadError}
+                            </p>
+                        )}
 
                         <button
-                            onClick={() => setScreen("creator")}
-                            className="w-full py-3 md:py-4 rounded-2xl md:rounded-3xl bg-[#FFB800] text-[#1A1A2E] text-lg md:text-3xl font-black hover:brightness-105"
+                            type="button"
+                            onClick={handleSaveSettings}
+                            disabled={isSaving}
+                            className="px-5 py-2.5 rounded-xl bg-[#FFB800] text-[#1A1A2E] text-sm font-black disabled:opacity-60"
                         >
-                            ⚙ Manage Creator Setup →
+                            {isSaving ? "Saving..." : "Save Changes"}
                         </button>
                     </div>
-                </div>
 
-                {/* <div className="bg-white border border-gray-200 rounded-[1.75rem] md:rounded-[2.5rem] p-4 md:p-8 space-y-4 md:space-y-5">
-                    <div className="flex items-start gap-3 md:gap-4">
-                        <div className="w-10 h-10 md:w-14 md:h-14 rounded-xl md:rounded-2xl bg-amber-50 text-amber-500 flex items-center justify-center shrink-0">
-                            <svg className="w-5 h-5 md:w-7 md:h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h8M8 14h4m8 5l-4-4H7a3 3 0 01-3-3V6a3 3 0 013-3h10a3 3 0 013 3v13z" />
-                            </svg>
+                    <div className="bg-white border border-gray-100 rounded-3xl p-5 md:p-6 space-y-4">
+                        <div className="flex items-center justify-between gap-3">
+                            <h3 className="text-lg font-black text-[#1A1A2E]">Recent SuperChats</h3>
+                            <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">{donations.length} total</span>
                         </div>
-                        <div>
-                            <h3 className="text-2xl md:text-4xl font-black tracking-tight text-[#1A1A2E]">Send a SuperChat</h3>
-                            <p className="text-sm md:text-2xl font-bold text-gray-500">Support your favorite creators</p>
-                        </div>
-                    </div>
-                    <p className="text-base md:text-3xl leading-relaxed text-gray-500 font-medium">
-                        Visit a creator&apos;s tip link to send them a highlighted message with a crypto tip via USDC or XLM.
-                    </p>
-                    <button
-                        onClick={() => setScreen("sender")}
-                        className="w-full py-3 md:py-4 rounded-2xl md:rounded-3xl border border-gray-200 text-[#1A1A2E] text-lg md:text-3xl font-black hover:bg-gray-50"
-                    >
-                        👁 Preview Sender Flow
-                    </button>
-                </div> */}
-            </div>
 
-            <div className="space-y-2 md:space-y-3">
-                <h4 className="text-xl md:text-4xl font-black tracking-tight text-[#1A1A2E]">Recent SuperChats</h4>
-                <div className="bg-white border border-gray-200 rounded-2xl md:rounded-3xl p-4 md:p-6">
-                    <p className="text-sm md:text-base font-semibold text-gray-500">
-                        No SuperChats yet. Live activity will appear here once transactions start.
-                    </p>
-                </div>
-            </div>
+                        {donations.length === 0 ? (
+                            <div className="p-6 rounded-2xl bg-[#F8F9FB] border border-dashed border-gray-200 text-center">
+                                <p className="text-sm font-semibold text-gray-500">No SuperChats yet. Transactions will appear here.</p>
+                            </div>
+                        ) : (
+                            <div className="space-y-3">
+                                {donations.map((donation, index) => {
+                                    const key = donation?._id || donation?.id || donation?.txHash || `${index}-${donation?.createdAt || "donation"}`;
+                                    const senderName = donation?.senderName || donation?.name || "Anonymous";
+                                    const message = donation?.message || "";
+                                    const amount = formatUsdcFromStroops(donation?.amount);
+                                    const created = formatTimestamp(donation?.createdAt);
+                                    const txHash = donation?.txHash || donation?.hash || "";
 
-            <div className="bg-white border border-gray-200 rounded-2xl md:rounded-3xl p-4 md:p-6 space-y-4 md:space-y-5">
-                <h4 className="text-xl md:text-4xl font-black tracking-tight text-[#1A1A2E]">How SuperChat Works</h4>
-                <div className="grid md:grid-cols-3 gap-4">
-                    <div className="rounded-2xl md:rounded-3xl bg-[#F2F5F9] p-4 md:p-5 text-center">
-                        <div className="w-10 h-10 md:w-14 md:h-14 mx-auto rounded-full bg-amber-50 text-amber-500 flex items-center justify-center mb-3 md:mb-4">
-                            <svg className="w-5 h-5 md:w-7 md:h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l3-3m0 0l-3-3m3 3H3m17 0a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                        </div>
-                        <p className="text-lg md:text-3xl font-black text-[#1A1A2E]">Share Your Link</p>
-                        <p className="text-sm md:text-2xl text-gray-500 font-semibold mt-2">Paste your tip link in your YouTube, Twitch, or social media bio.</p>
+                                    return (
+                                        <div key={key} className="bg-[#F8F9FB] border border-gray-100 rounded-2xl p-4 flex items-start justify-between gap-3">
+                                            <div className="min-w-0 space-y-1">
+                                                <div className="flex items-center gap-2">
+                                                    <p className="text-sm font-black text-[#1A1A2E] truncate">{senderName}</p>
+                                                    {created && <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{created}</span>}
+                                                </div>
+                                                {message ? (
+                                                    <p className="text-sm text-gray-600 font-semibold break-words">{message}</p>
+                                                ) : (
+                                                    <p className="text-xs text-gray-400 font-semibold italic">No message</p>
+                                                )}
+                                                {txHash && (
+                                                    <p className="text-[10px] font-mono text-gray-400">
+                                                        {shortAddress(txHash, 10, 8)}
+                                                    </p>
+                                                )}
+                                            </div>
+                                            <div className="text-right shrink-0">
+                                                <p className="text-lg font-black text-emerald-600">${amount}</p>
+                                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">USDC</p>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
                     </div>
-                    <div className="rounded-2xl md:rounded-3xl bg-[#F2F5F9] p-4 md:p-5 text-center">
-                        <div className="w-10 h-10 md:w-14 md:h-14 mx-auto rounded-full bg-amber-50 text-amber-500 flex items-center justify-center mb-3 md:mb-4">
-                            <svg className="w-5 h-5 md:w-7 md:h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h8M8 14h4m8 5l-4-4H7a3 3 0 01-3-3V6a3 3 0 013-3h10a3 3 0 013 3v13z" />
-                            </svg>
-                        </div>
-                        <p className="text-lg md:text-3xl font-black text-[#1A1A2E]">Fans Send Tips</p>
-                        <p className="text-sm md:text-2xl text-gray-500 font-semibold mt-2">Viewers visit your link, compose a message, pick a color tier, and pay in USDC or XLM.</p>
-                    </div>
-                    <div className="rounded-2xl md:rounded-3xl bg-[#F2F5F9] p-4 md:p-5 text-center">
-                        <div className="w-10 h-10 md:w-14 md:h-14 mx-auto rounded-full bg-amber-50 text-amber-500 flex items-center justify-center mb-3 md:mb-4">
-                            <svg className="w-5 h-5 md:w-7 md:h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14m-6 4H5a2 2 0 01-2-2V8a2 2 0 012-2h4m6 12V6m0 12H9m6 0H9" />
-                            </svg>
-                        </div>
-                        <p className="text-lg md:text-3xl font-black text-[#1A1A2E]">Show on Stream</p>
-                        <p className="text-sm md:text-2xl text-gray-500 font-semibold mt-2">Add the overlay link to OBS/Streamlabs to display SuperChats live on your stream.</p>
-                    </div>
-                </div>
-            </div>
+                </>
+            )}
         </div>
     );
 }

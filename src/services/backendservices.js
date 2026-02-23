@@ -1,9 +1,9 @@
 import axios from 'axios';
 
-const API_URL = "https://f8c3-2409-40d7-a8-6109-906b-5a7d-19ae-5972.ngrok-free.app";
+export const BACKEND_API_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
 
 const api = axios.create({
-    baseURL: API_URL,
+    baseURL: BACKEND_API_URL,
     headers: {
         'Content-Type': 'application/json',
         'ngrok-skip-browser-warning': 'true',
@@ -96,6 +96,46 @@ export const transferUSDC = async (transferData) => {
         return response.data;
     } catch (error) {
         console.error("Transfer USDC failed:", error);
+        throw error;
+    }
+};
+
+export const backendDonate = async (data) => {
+    try {
+        const response = await api.post('/donate', data);
+        return response.data;
+    } catch (error) {
+        console.error("Donate failed:", error);
+        throw error;
+    }
+};
+
+export const backendGetCreatorSettings = async (userId) => {
+    try {
+        const response = await api.get(`/creator/settings/${encodeURIComponent(userId)}`);
+        return response.data;
+    } catch (error) {
+        console.error("Get creator settings failed:", error);
+        throw error;
+    }
+};
+
+export const backendUpdateCreatorSettings = async (userId, data) => {
+    try {
+        const response = await api.put(`/creator/settings/${encodeURIComponent(userId)}`, data);
+        return response.data;
+    } catch (error) {
+        console.error("Update creator settings failed:", error);
+        throw error;
+    }
+};
+
+export const backendGetCreatorDonations = async (userId) => {
+    try {
+        const response = await api.get(`/creator/donations/${encodeURIComponent(userId)}`);
+        return response.data;
+    } catch (error) {
+        console.error("Get creator donations failed:", error);
         throw error;
     }
 };

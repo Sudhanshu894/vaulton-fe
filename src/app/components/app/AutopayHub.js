@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Address, xdr } from "@stellar/stellar-sdk";
 import {
     backendCancelScheduledTransfer,
     backendExecuteScheduledTransfer,
     backendListScheduledTransfers,
     backendScheduleTransfer,
+    getUSDCBalance,
     loginChallenge,
 } from "@/services/backendservices";
 import { parsePaymentRequest, shortAddress } from "@/lib/paymentRequest";
@@ -112,6 +113,43 @@ const parseUsdcToStroops = (value) => {
         throw new Error("Amount must be greater than 0");
     }
     return total.toString();
+};
+
+const extractBalanceStroops = (payload) => {
+    const direct =
+        payload?.balanceInStroops ??
+        payload?.balanceStroops ??
+        payload?.balance_stroops ??
+        payload?.stroops;
+    if (direct != null) {
+        const clean = String(direct).trim();
+        if (/^\d+$/.test(clean)) return BigInt(clean);
+    }
+
+    const usdcValue =
+        payload?.balanceInUsdc ??
+        payload?.balanceUsdc ??
+        payload?.balance_in_usdc ??
+        payload?.usdcBalance;
+    if (usdcValue != null) {
+        return BigInt(parseUsdcToStroops(usdcValue));
+    }
+
+    const fallback = payload?.balance;
+    if (fallback != null) {
+        const clean = String(fallback).trim();
+        if (/^\d+$/.test(clean)) return BigInt(clean);
+        return BigInt(parseUsdcToStroops(clean));
+    }
+
+    throw new Error("Unable to read current wallet balance");
+};
+
+const formatStroopsToUsdc2 = (value) => {
+    const amount = value < 0n ? -value : value;
+    const whole = amount / STROOPS_PER_USDC;
+    const frac = (amount % STROOPS_PER_USDC).toString().padStart(7, "0").slice(0, 2);
+    return `${whole.toString()}.${frac}`;
 };
 
 const isLikelyWalletAddress = (value) => RECIPIENT_ADDRESS_RE.test(String(value || "").trim());
@@ -282,6 +320,13 @@ export default function AutopayHub({ onBack, user, onDataChanged }) {
         () => transfers.filter((item) => item.status === "pending"),
         [transfers]
     );
+    const hasDuePendingTransfers = useMemo(
+        () => pendingTransfers.some((item) => {
+            const scheduledAtMs = new Date(item.scheduledTime || item.deadline || 0).getTime();
+            return Number.isFinite(scheduledAtMs) && scheduledAtMs <= nowMs;
+        }),
+        [pendingTransfers, nowMs]
+    );
 
     useEffect(() => {
         if (activeTransfers.length === 0) return undefined;
@@ -291,30 +336,49 @@ export default function AutopayHub({ onBack, user, onDataChanged }) {
         return () => window.clearInterval(timerId);
     }, [activeTransfers.length]);
 
-    const loadTransfers = async () => {
+    const loadTransfers = useCallback(async ({ silent = false } = {}) => {
         if (!walletAddress) {
             setTransfers([]);
             setListError("");
             return;
         }
 
-        setIsLoadingList(true);
-        setListError("");
+        if (!silent) {
+            setIsLoadingList(true);
+            setListError("");
+        }
         try {
             const data = await backendListScheduledTransfers(walletAddress);
             setTransfers(normalizeTransferList(data));
         } catch (error) {
             console.error("Failed to load scheduled transfers", error);
-            setTransfers([]);
-            setListError(getErrorMessage(error, "Could not load autopay list"));
+            if (!silent) {
+                setTransfers([]);
+                setListError(getErrorMessage(error, "Could not load autopay list"));
+            }
         } finally {
-            setIsLoadingList(false);
+            if (!silent) setIsLoadingList(false);
         }
-    };
+    }, [walletAddress]);
 
     useEffect(() => {
         loadTransfers();
-    }, [walletAddress]);
+    }, [loadTransfers]);
+
+    useEffect(() => {
+        if (!walletAddress || !hasDuePendingTransfers) return undefined;
+        const timerId = window.setInterval(() => {
+            loadTransfers({ silent: true }).catch((error) => {
+                console.error("Auto-refresh failed for due autopay items", error);
+            });
+            if (onDataChanged) {
+                Promise.resolve(onDataChanged()).catch((error) => {
+                    console.error("Failed to refresh linked dashboard data", error);
+                });
+            }
+        }, 5000);
+        return () => window.clearInterval(timerId);
+    }, [walletAddress, hasDuePendingTransfers, loadTransfers, onDataChanged]);
 
     const stopScanner = async () => {
         const instance = scannerInstanceRef.current;
@@ -450,6 +514,17 @@ export default function AutopayHub({ onBack, user, onDataChanged }) {
         }
     };
 
+    const assertSufficientBalance = useCallback(async (requiredStroops, contextLabel) => {
+        if (!walletAddress) throw new Error("No smart account found. Please log in first.");
+
+        const required = BigInt(String(requiredStroops || 0));
+        const balanceData = await getUSDCBalance(walletAddress);
+        const available = extractBalanceStroops(balanceData);
+        if (available < required) {
+            throw new Error(`Insufficient balance for ${contextLabel}. Available $${formatStroopsToUsdc2(available)} USDC.`);
+        }
+    }, [walletAddress]);
+
     const handleCreateAutopay = async () => {
         setFormError("");
         setBanner(null);
@@ -471,6 +546,8 @@ export default function AutopayHub({ onBack, user, onDataChanged }) {
             if (deadline <= Date.now()) {
                 throw new Error("Scheduled time must be in the future");
             }
+
+            await assertSufficientBalance(amountInStroops, "this scheduled autopay");
 
             const txIdHex = randomTxIdHex();
             const challengeBytes = await buildScheduledTransferChallengeBytes({
@@ -512,10 +589,13 @@ export default function AutopayHub({ onBack, user, onDataChanged }) {
         }
     };
 
-    const handleExecute = async (txIdHex) => {
+    const handleExecute = async (item) => {
+        const txIdHex = item?.id;
+        if (!txIdHex) return;
         setBanner(null);
         setActionState({ txId: txIdHex, kind: "execute" });
         try {
+            await assertSufficientBalance(item?.amount, "autopay execution");
             const result = await backendExecuteScheduledTransfer(txIdHex);
             if (result?.success) {
                 setBanner({ type: "success", message: `Autopay executed${result.txHash ? ` • ${shortAddress(result.txHash, 10, 8)}` : ""}` });
@@ -597,7 +677,7 @@ export default function AutopayHub({ onBack, user, onDataChanged }) {
 
                 <div className="flex items-center gap-3">
                     <button
-                        onClick={loadTransfers}
+                        onClick={() => loadTransfers()}
                         type="button"
                         className="px-4 py-3 rounded-2xl bg-white border border-gray-100 font-bold text-[#1A1A2E] shadow-sm hover:shadow-md disabled:opacity-50"
                         disabled={isLoadingList}
@@ -723,7 +803,7 @@ export default function AutopayHub({ onBack, user, onDataChanged }) {
                                                     {isPending && (
                                                         <button
                                                             type="button"
-                                                            onClick={() => handleExecute(item.id)}
+                                                            onClick={() => handleExecute(item)}
                                                             disabled={isBusy}
                                                             className="px-4 py-2 rounded-xl bg-[#1A1A2E] text-white text-xs font-black uppercase tracking-wider disabled:opacity-50"
                                                         >

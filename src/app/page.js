@@ -1,12 +1,18 @@
-"use client";
-
 import Navbar from "./components/Navbar";
 import HeroSection from "./components/HeroSection";
 import FeaturesSection from "./components/FeaturesSection";
 import TeamSection from "./components/TeamSection";
 import Animations from "./components/Animations";
+import { redirect } from "next/navigation";
 
-export default function Home() {
+export default async function Home({ searchParams }) {
+  const resolvedSearchParams = await searchParams;
+  const type = resolvedSearchParams?.type;
+
+  if (type !== "landing") {
+    redirect("/dashboard");
+  }
+
   return (
     <main className="min-h-screen bg-[#F8F9FB] text-[#1A1A2E] overflow-x-hidden">
       <Animations />

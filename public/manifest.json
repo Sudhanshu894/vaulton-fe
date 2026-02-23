@@ -2,7 +2,7 @@
     "name": "Vaulton - Keyless Wallet",
     "short_name": "Vaulton",
     "description": "The ultimate keyless wallet with passkey authentication - secure your payments & enhance your experience with web3 wallet",
-    "start_url": "/",
+    "start_url": "/dashboard",
     "display": "standalone",
     "background_color": "#FAFAFA",
     "theme_color": "#1A1A2E",

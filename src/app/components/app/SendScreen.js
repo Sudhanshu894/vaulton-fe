@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { startAuthentication } from "@simplewebauthn/browser";
 import {
     backendDonate,
+    getUSDCBalance,
     getTransactions,
     getNonce,
     loginChallenge,
@@ -22,7 +23,7 @@ const CONTACT_COLOR_CLASSES = [
     "bg-cyan-100 text-cyan-600",
 ];
 const QR_REGION_ID = "vaulton-send-qr-reader";
-const STROOPS_PER_USDC = 10_000_000;
+const STROOPS_PER_USDC_BIGINT = 10_000_000n;
 
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -80,8 +81,60 @@ const derToRs = (der) => {
     return rs;
 };
 
+const usdcTextToStroopsBigInt = (value) => {
+    const raw = String(value || "").trim();
+    if (!raw) throw new Error("Amount is required");
+
+    const normalized = raw.startsWith(".") ? `0${raw}` : raw;
+    if (!/^\d*(?:\.\d{0,7})?$/.test(normalized) || normalized === ".") {
+        throw new Error("Enter a valid USDC amount");
+    }
+
+    const [wholeRaw, fracRaw = ""] = normalized.split(".");
+    const whole = BigInt(wholeRaw || "0");
+    const frac = BigInt((fracRaw + "0000000").slice(0, 7) || "0");
+    return whole * STROOPS_PER_USDC_BIGINT + frac;
+};
+
+const formatStroopsToUsdc2 = (value) => {
+    const amount = value < 0n ? -value : value;
+    const whole = amount / STROOPS_PER_USDC_BIGINT;
+    const frac = (amount % STROOPS_PER_USDC_BIGINT).toString().padStart(7, "0").slice(0, 2);
+    return `${whole.toString()}.${frac}`;
+};
+
+const extractBalanceStroops = (payload) => {
+    const direct =
+        payload?.balanceInStroops ??
+        payload?.balanceStroops ??
+        payload?.balance_stroops ??
+        payload?.stroops;
+    if (direct != null) {
+        const clean = String(direct).trim();
+        if (/^\d+$/.test(clean)) return BigInt(clean);
+    }
+
+    const usdcValue =
+        payload?.balanceInUsdc ??
+        payload?.balanceUsdc ??
+        payload?.balance_in_usdc ??
+        payload?.usdcBalance;
+    if (usdcValue != null) {
+        return usdcTextToStroopsBigInt(usdcValue);
+    }
+
+    const fallback = payload?.balance;
+    if (fallback != null) {
+        const clean = String(fallback).trim();
+        if (/^\d+$/.test(clean)) return BigInt(clean);
+        return usdcTextToStroopsBigInt(clean);
+    }
+
+    throw new Error("Unable to read current wallet balance");
+};
+
 const buildTransferChallengeBase64Url = async (amountUsdc, nonce) => {
-    const amountInStroops = BigInt(Math.floor(Number(amountUsdc) * STROOPS_PER_USDC));
+    const amountInStroops = usdcTextToStroopsBigInt(amountUsdc);
     if (amountInStroops <= 0n) {
         throw new Error("Amount must be greater than 0");
     }
@@ -508,6 +561,19 @@ export default function SendScreen({
         };
     };
 
+    const assertSufficientBalance = async (amountText) => {
+        if (!walletAddress) {
+            throw new Error("No smart account found. Please log in first.");
+        }
+
+        const requiredStroops = usdcTextToStroopsBigInt(amountText);
+        const balanceData = await getUSDCBalance(walletAddress);
+        const availableStroops = extractBalanceStroops(balanceData);
+        if (availableStroops < requiredStroops) {
+            throw new Error(`Insufficient balance. Available $${formatStroopsToUsdc2(availableStroops)} USDC.`);
+        }
+    };
+
     const handleProcessPayment = async () => {
         setProcessingError("");
         setPaymentReceipt(null);
@@ -517,6 +583,11 @@ export default function SendScreen({
 
         try {
             const amountText = validateBeforeProcessing();
+            if (!anonymousMode) {
+                setProcessingStatus("Checking current wallet balance...");
+                await assertSufficientBalance(amountText);
+            }
+
             const receipt = anonymousMode
                 ? await processAnonymousPayment(amountText)
                 : await processStandardPayment(amountText);

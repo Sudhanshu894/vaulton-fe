@@ -131,7 +131,6 @@ export default function SendScreen({
     forceAnonymousMode = false,
     showRecipientSuggestions = true,
     title = "Send to",
-    cancelLabel = "Cancel",
 }) {
     const [step, setStep] = useState(1);
     const [selectedContact, setSelectedContact] = useState(null);
@@ -162,6 +161,11 @@ export default function SendScreen({
     const parsedSearch = useMemo(() => parsePaymentRequest(searchQuery), [searchQuery]);
     const selectedRecipientAddress = selectedContact?.address || "";
     const walletAddress = user?.smartAccountId;
+    const formattedBalance = useMemo(() => {
+        const value = Number(balance);
+        if (!Number.isFinite(value)) return "0.00";
+        return value.toFixed(2);
+    }, [balance]);
 
     useEffect(() => {
         if (forceAnonymousMode) {
@@ -476,9 +480,20 @@ export default function SendScreen({
             case 1:
                 return (
                     <div className="space-y-8 animate-fade-in">
-                        <div className="flex items-center justify-between gap-3">
+                        <div className="space-y-2">
+                            <button
+                                onClick={onBack}
+                                type="button"
+                                className="inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-gray-400 hover:text-[#1A1A2E] transition-colors"
+                            >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                                </svg>
+                                <span>Home</span>
+                                <span>/</span>
+                                <span className="text-[#1A1A2E]">{title}</span>
+                            </button>
                             <h3 className="text-2xl font-black text-[#1A1A2E]">{title}</h3>
-                            <button onClick={onBack} className="text-gray-400 font-bold hover:text-[#1A1A2E]">{cancelLabel}</button>
                         </div>
 
                         <div className="relative group">
@@ -591,7 +606,7 @@ export default function SendScreen({
                             <button className="px-6 py-2 bg-gray-100 rounded-full text-sm font-bold text-[#1A1A2E] flex items-center gap-2 mx-auto">
                                 USDC <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
                             </button>
-                            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Available: ${balance} USDC</p>
+                            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Available: ${formattedBalance} USDC</p>
                         </div>
 
                         <div className="flex justify-center gap-3 flex-wrap">

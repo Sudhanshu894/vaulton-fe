@@ -14,8 +14,8 @@ const menuItems = [
 export default function AppSidebar({ isOpen, onClose, setActiveTab, activeTab, onLogout }) {
     const sidebarContent = (
         <div className="flex flex-col h-full">
-            <div className="flex items-center justify-between mb-12">
-                <Image src="/logo.png" alt="Vaulton" width={100} height={32} className="brightness-0 invert h-10 w-auto" />
+            <div className="flex items-left relative justify-between h-20">
+                {/* <Image src="/logo.png" alt="Vaulton" fill objectFit="contain" className="brightness-0 invert h-10 w-auto" /> */}
                 <button onClick={onClose} className="md:hidden p-2 hover:bg-white/10 rounded-xl transition-colors">
                     <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -80,14 +80,14 @@ export default function AppSidebar({ isOpen, onClose, setActiveTab, activeTab, o
                             animate={{ opacity: 1 }}
                             exit={{ opacity: 0 }}
                             onClick={onClose}
-                            className="fixed inset-0 bg-[#1A1A2E]/40 backdrop-blur-sm z-50 md:hidden"
+                            className="fixed top-20 left-0 right-0 bottom-0 bg-[#1A1A2E]/40 backdrop-blur-sm z-50 md:hidden"
                         />
                         <motion.div
                             initial={{ x: "-100%" }}
                             animate={{ x: 0 }}
                             exit={{ x: "-100%" }}
                             transition={{ type: "spring", damping: 25, stiffness: 200 }}
-                            className="fixed top-0 left-0 bottom-0 w-[280px] bg-[#1A1A2E] text-white z-50 flex flex-col p-8 md:hidden"
+                            className="fixed top-20 left-0 bottom-0 w-[280px] bg-[#1A1A2E] text-white z-50 flex flex-col p-8 md:hidden"
                         >
                             {sidebarContent}
                         </motion.div>

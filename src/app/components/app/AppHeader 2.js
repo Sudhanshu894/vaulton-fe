@@ -1,12 +1,11 @@
 "use client";
 
 import Image from "next/image";
-import { motion } from "framer-motion";
 
 export default function AppHeader({ onMenuClick, onProfileClick, userName }) {
     return (
-        <header className="fixed md:sticky top-0 left-0 right-0 z-50 bg-[#F8F9FB]/80 backdrop-blur-md border-b border-gray-100/50 px-6 py-4 flex items-center justify-between w-full">
-            <div className="flex items-center gap-4">
+        <header className="fixed md:sticky top-0 left-0 right-0 z-50 h-16 md:h-20 bg-[#F8F9FB]/80 backdrop-blur-md border-b border-gray-100/50 px-4 md:px-6 flex items-center justify-between w-full">
+            <div className="flex items-center gap-3 md:gap-4 min-w-0">
                 <button
                     onClick={onMenuClick}
                     className="p-2 -ml-2 text-[#1A1A2E] hover:bg-gray-100 rounded-xl transition-colors md:hidden"
@@ -15,9 +14,9 @@ export default function AppHeader({ onMenuClick, onProfileClick, userName }) {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
                     </svg>
                 </button>
-                <div className="flex items-center gap-2">
-                    <Image src="/logo.png" alt="Vaulton" width={32} height={32} className="object-contain" />
-                    <span className="text-xl font-black text-[#1A1A2E] tracking-tight">Vaulton</span>
+                <div className="flex items-center relative h-10 md:h-14 w-[132px] md:w-[176px]">
+                    <Image src="/logo.png" alt="Vaulton" fill className="object-contain" />
+                    {/* <span className="text-xl font-black text-[#1A1A2E] tracking-tight">Vaulton</span> */}
                 </div>
             </div>
 

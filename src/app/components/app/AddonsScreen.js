@@ -80,7 +80,10 @@ export default function AddonsScreen({ onBack, onSelectAddon }) {
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: index * 0.1 }}
-                        onClick={() => addon.id === 'anonymous' && onSelectAddon('anonymous')}
+                        onClick={() => {
+                            if (addon.id === "anonymous") onSelectAddon("anonymous");
+                            if (addon.id === "streaming") onSelectAddon("streaming");
+                        }}
                         className={`group relative p-5 md:p-6 bg-white border border-gray-100 rounded-[2rem] md:rounded-[2.5rem] shadow-sm hover:shadow-xl hover:border-[#FFB800]/50 transition-all duration-500 cursor-pointer overflow-hidden ${addon.status === "Coming Soon" || addon.status === "Roadmap" ? "opacity-70" : ""}`}
                     >
                         <div className="flex items-start gap-4 md:gap-5">

@@ -48,6 +48,11 @@ export default function DashboardHome({ onNavigate, user, balance, refreshBalanc
     const [isLoadingPreviews, setIsLoadingPreviews] = useState(false);
 
     const walletAddress = user?.smartAccountId;
+    const formattedBalance = useMemo(() => {
+        const value = Number(balance);
+        if (!Number.isFinite(value)) return "0.00";
+        return value.toFixed(2);
+    }, [balance]);
 
     useEffect(() => {
         if (!walletAddress) {
@@ -122,7 +127,7 @@ export default function DashboardHome({ onNavigate, user, balance, refreshBalanc
                         </div>
 
                         <div>
-                            <h2 className="text-3xl sm:text-5xl md:text-7xl font-black tracking-tighter leading-none break-all truncate max-w-full">${balance}</h2>
+                            <h2 className="text-3xl sm:text-5xl md:text-7xl font-black tracking-tighter leading-none break-all truncate max-w-full">${formattedBalance}</h2>
                             <div className="flex items-center gap-3 mt-4 group cursor-pointer w-fit max-w-full" onClick={() => user?.smartAccountId && navigator.clipboard.writeText(user.smartAccountId)}>
                                 <p className="text-gray-400 text-sm font-mono truncate">{user?.smartAccountId ? shortAddress(user.smartAccountId, 8, 8) : "No smart account deployed"}</p>
                                 {user?.smartAccountId && (
@@ -136,8 +141,8 @@ export default function DashboardHome({ onNavigate, user, balance, refreshBalanc
                         <div className="grid grid-cols-2 gap-4 md:gap-6 pt-4">
                             <div className="bg-white/5 p-4 md:p-6 rounded-3xl border border-white/5 backdrop-blur-md hover:bg-white/10 transition-all duration-300 min-w-0 overflow-hidden">
                                 <p className="text-gray-400 text-[10px] font-bold uppercase tracking-widest mb-2">USDC</p>
-                                <p className="text-lg md:text-2xl font-black truncate">${balance}</p>
-                                <p className="text-gray-500 text-[10px] font-bold truncate">{balance} USDC</p>
+                                <p className="text-lg md:text-2xl font-black truncate">${formattedBalance}</p>
+                                <p className="text-gray-500 text-[10px] font-bold truncate">{formattedBalance} USDC</p>
                             </div>
                             <div className="bg-white/5 p-4 md:p-6 rounded-3xl border border-white/5 backdrop-blur-md hover:bg-white/10 transition-all duration-300 min-w-0">
                                 <p className="text-gray-400 text-[10px] font-bold uppercase tracking-widest mb-2">Network</p>
@@ -175,7 +180,7 @@ export default function DashboardHome({ onNavigate, user, balance, refreshBalanc
             </div>
 
             <div className="grid lg:grid-cols-2 gap-8">
-                <section className="bg-white rounded-[2rem] md:rounded-[3rem] p-6 md:p-10 border border-gray-100 shadow-sm space-y-6 md:space-y-8">
+                <section className="bg-white rounded-[2rem] md:rounded-[3rem] p-6 md:p-10 border border-gray-100 shadow-sm space-y-6 md:space-y-8 overflow-hidden">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
                             <div className="p-3 bg-purple-50 text-purple-600 rounded-2xl">
@@ -224,7 +229,7 @@ export default function DashboardHome({ onNavigate, user, balance, refreshBalanc
                     </div>
                 </section>
 
-                <section className="bg-white rounded-[2rem] md:rounded-[3rem] p-6 md:p-10 border border-gray-100 shadow-sm space-y-6 md:space-y-8">
+                <section className="bg-white rounded-[2rem] md:rounded-[3rem] p-6 md:p-10 border border-gray-100 shadow-sm space-y-6 md:space-y-8 overflow-hidden">
                     <div className="flex items-center justify-between">
                         <h3 className="text-xl md:text-2xl font-black text-[#1A1A2E]">Recent Activity</h3>
                         <button
@@ -256,7 +261,7 @@ export default function DashboardHome({ onNavigate, user, balance, refreshBalanc
                                     <button
                                         key={tx._id || tx.hash}
                                         onClick={() => router.push("/dashboard/transactions")}
-                                        className="w-full flex items-center justify-between group cursor-pointer hover:bg-gray-50 -mx-6 px-4 md:px-6 py-3 rounded-[1.5rem] md:rounded-[2rem] transition-all text-left"
+                                        className="w-full flex items-center justify-between group cursor-pointer hover:bg-gray-50 px-3 md:px-4 py-3 rounded-[1.5rem] md:rounded-[2rem] transition-all text-left"
                                     >
                                         <div className="flex items-center gap-4 md:gap-5 min-w-0">
                                             <div className={`w-10 h-10 md:w-14 md:h-14 ${isIncoming ? "bg-emerald-50 text-emerald-500" : "bg-blue-50 text-blue-500"} rounded-full flex items-center justify-center shrink-0`}>

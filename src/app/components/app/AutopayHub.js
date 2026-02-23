@@ -14,6 +14,11 @@ import { parsePaymentRequest, shortAddress } from "@/lib/paymentRequest";
 const STROOPS_PER_USDC = 10_000_000n;
 const QR_REGION_ID = "vaulton-autopay-qr-reader";
 const ACTIVE_STATUSES = new Set(["pending", "executing"]);
+const SECOND_MS = 1000;
+const MINUTE_MS = 60 * SECOND_MS;
+const HOUR_MS = 60 * MINUTE_MS;
+const DAY_MS = 24 * HOUR_MS;
+const WEEK_MS = 7 * DAY_MS;
 
 const STATUS_STYLES = {
     pending: "bg-amber-50 text-amber-700 border-amber-100",
@@ -45,6 +50,39 @@ const formatDateTime = (value) => {
         hour: "numeric",
         minute: "2-digit",
     });
+};
+
+const pluralize = (count, unit) => `${count} ${unit}${count === 1 ? "" : "s"}`;
+
+const formatRemainingLabel = (scheduledAtMs, nowMs) => {
+    if (!Number.isFinite(scheduledAtMs)) return "";
+    const remainingMs = scheduledAtMs - nowMs;
+    if (remainingMs <= 0) return "Due now";
+
+    if (remainingMs < HOUR_MS) {
+        const seconds = Math.max(1, Math.ceil(remainingMs / SECOND_MS));
+        return `${seconds}s remaining`;
+    }
+
+    if (remainingMs < DAY_MS) {
+        const minutes = Math.max(1, Math.ceil(remainingMs / MINUTE_MS));
+        return `${pluralize(minutes, "min")} remaining`;
+    }
+
+    if (remainingMs < 2 * DAY_MS) {
+        const hours = Math.max(1, Math.ceil(remainingMs / HOUR_MS));
+        return `${pluralize(hours, "hr")} remaining`;
+    }
+
+    if (remainingMs > WEEK_MS) {
+        const weeks = Math.floor(remainingMs / WEEK_MS);
+        const days = Math.floor((remainingMs % WEEK_MS) / DAY_MS);
+        if (days > 0) return `${pluralize(weeks, "week")} ${pluralize(days, "day")} remaining`;
+        return `${pluralize(weeks, "week")} remaining`;
+    }
+
+    const days = Math.max(1, Math.ceil(remainingMs / DAY_MS));
+    return `${pluralize(days, "day")} remaining`;
 };
 
 const formatStroopsToUsdc = (value) => {
@@ -193,6 +231,13 @@ const getErrorMessage = (error, fallback) => {
     return error.message || fallback;
 };
 
+const compactErrorMessage = (message, max = 120) => {
+    const text = String(message || "").replace(/\s+/g, " ").trim();
+    if (!text) return "";
+    if (text.length <= max) return text;
+    return `${text.slice(0, max - 1)}…`;
+};
+
 const statusChipClass = (status) => STATUS_STYLES[status] || "bg-gray-50 text-gray-700 border-gray-200";
 
 const normalizeTransferList = (data) => {
@@ -206,6 +251,7 @@ const normalizeTransferList = (data) => {
 
 export default function AutopayHub({ onBack, user, onDataChanged }) {
     const [transfers, setTransfers] = useState([]);
+    const [nowMs, setNowMs] = useState(() => Date.now());
     const [isLoadingList, setIsLoadingList] = useState(false);
     const [listError, setListError] = useState("");
 
@@ -236,6 +282,14 @@ export default function AutopayHub({ onBack, user, onDataChanged }) {
         () => transfers.filter((item) => item.status === "pending"),
         [transfers]
     );
+
+    useEffect(() => {
+        if (activeTransfers.length === 0) return undefined;
+        const timerId = window.setInterval(() => {
+            setNowMs(Date.now());
+        }, 1000);
+        return () => window.clearInterval(timerId);
+    }, [activeTransfers.length]);
 
     const loadTransfers = async () => {
         if (!walletAddress) {
@@ -568,7 +622,9 @@ export default function AutopayHub({ onBack, user, onDataChanged }) {
                         ? "bg-amber-50 border-amber-100 text-amber-800"
                         : "bg-red-50 border-red-100 text-red-800"}`}>
                     <div className="flex items-start justify-between gap-3">
-                        <p className="text-sm font-bold break-words">{banner.message}</p>
+                        <p className="text-sm font-bold break-words" title={banner.message}>
+                            {banner.type === "success" ? banner.message : compactErrorMessage(banner.message, 140)}
+                        </p>
                         <button type="button" onClick={() => setBanner(null)} className="text-xs font-black uppercase tracking-widest opacity-70 hover:opacity-100">Close</button>
                     </div>
                 </div>
@@ -594,7 +650,7 @@ export default function AutopayHub({ onBack, user, onDataChanged }) {
                         <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-5 space-y-2">
                             <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Pending</p>
                             <p className="text-3xl font-black text-[#1A1A2E]">{pendingTransfers.length}</p>
-                            <p className="text-xs font-bold text-gray-400">Ready to cancel or execute</p>
+                            <p className="text-xs font-bold text-gray-400">Ready to send now or cancel</p>
                         </div>
                         <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-5 space-y-2">
                             <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Completed</p>
@@ -620,8 +676,8 @@ export default function AutopayHub({ onBack, user, onDataChanged }) {
                                 Loading scheduled autopay payments...
                             </div>
                         ) : listError ? (
-                            <div className="p-6 rounded-2xl bg-red-50 border border-red-100 text-red-700 text-sm font-semibold">
-                                {listError}
+                            <div className="p-3 rounded-xl bg-red-50 border border-red-100 text-red-700 text-xs font-semibold" title={listError}>
+                                {compactErrorMessage(listError, 130)}
                             </div>
                         ) : transfers.length === 0 ? (
                             <div className="p-8 rounded-2xl bg-gray-50 border border-dashed border-gray-200 text-center space-y-2">
@@ -633,8 +689,12 @@ export default function AutopayHub({ onBack, user, onDataChanged }) {
                                 {transfers.map((item) => {
                                     const isPending = item.status === "pending";
                                     const isBusy = actionState.txId === item.id;
+                                    const scheduledAtMs = new Date(item.scheduledTime || item.deadline || 0).getTime();
+                                    const timerLabel = ACTIVE_STATUSES.has(item.status)
+                                        ? formatRemainingLabel(scheduledAtMs, nowMs)
+                                        : "";
                                     return (
-                                        <div key={item.id} className="rounded-3xl border border-gray-100 bg-[#FAFBFD] p-4 md:p-5 space-y-4">
+                                        <div key={item.id} className="rounded-3xl border border-gray-100 bg-white p-4 md:p-5 space-y-4 shadow-[0_1px_0_0_rgba(17,24,39,0.02)]">
                                             <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
                                                 <div className="space-y-2 min-w-0">
                                                     <div className="flex flex-wrap items-center gap-2">
@@ -642,11 +702,16 @@ export default function AutopayHub({ onBack, user, onDataChanged }) {
                                                             {item.status}
                                                         </span>
                                                         <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">{shortAddress(item.id, 10, 8)}</span>
+                                                        {timerLabel && (
+                                                            <span className="px-2.5 py-1 rounded-full bg-[#EEF2FF] border border-[#DDE3FF] text-[11px] font-bold text-[#1A1A2E]">
+                                                                {timerLabel}
+                                                            </span>
+                                                        )}
                                                     </div>
                                                     <p className="text-sm md:text-base font-black text-[#1A1A2E] break-all" title={item.recipient}>
                                                         {item.recipient}
                                                     </p>
-                                                    <div className="flex flex-wrap gap-x-5 gap-y-1 text-xs font-semibold text-gray-500">
+                                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-5 gap-y-1 text-xs font-semibold text-gray-500">
                                                         <span>Amount: ${formatStroopsToUsdc(item.amount)} USDC</span>
                                                         <span>Scheduled: {formatDateTime(item.scheduledTime || item.deadline)}</span>
                                                         {item.createdAt && <span>Created: {formatDateTime(item.createdAt)}</span>}
@@ -662,7 +727,7 @@ export default function AutopayHub({ onBack, user, onDataChanged }) {
                                                             disabled={isBusy}
                                                             className="px-4 py-2 rounded-xl bg-[#1A1A2E] text-white text-xs font-black uppercase tracking-wider disabled:opacity-50"
                                                         >
-                                                            {isBusy && actionState.kind === "execute" ? "Executing..." : "Execute"}
+                                                            {isBusy && actionState.kind === "execute" ? "Sending..." : "Send now"}
                                                         </button>
                                                     )}
                                                     {isPending && (
@@ -687,9 +752,11 @@ export default function AutopayHub({ onBack, user, onDataChanged }) {
                                                         </div>
                                                     )}
                                                     {item.error && (
-                                                        <div className="bg-red-50 border border-red-100 rounded-2xl p-3">
+                                                        <div className="bg-red-50 border border-red-100 rounded-xl p-2.5">
                                                             <p className="text-[10px] font-black uppercase tracking-widest text-red-500 mb-1">Error</p>
-                                                            <p className="text-xs font-semibold text-red-700 break-words">{item.error}</p>
+                                                            <p className="text-xs font-semibold text-red-700 break-all leading-snug" title={item.error}>
+                                                                {compactErrorMessage(item.error, 120)}
+                                                            </p>
                                                         </div>
                                                     )}
                                                 </div>
@@ -791,8 +858,8 @@ export default function AutopayHub({ onBack, user, onDataChanged }) {
                             </div>
 
                             {formError && (
-                                <div className="rounded-2xl border border-red-100 bg-red-50 p-4 text-sm font-semibold text-red-700">
-                                    {formError}
+                                <div className="rounded-xl border border-red-100 bg-red-50 p-3 text-xs font-semibold text-red-700" title={formError}>
+                                    {compactErrorMessage(formError, 140)}
                                 </div>
                             )}
 

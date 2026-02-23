@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import AppHeader from "../components/app/AppHeader";
+import AppHeader from "../components/app/AppHeader 2";
 import AppBottomBar from "../components/app/AppBottomBar";
 import AppSidebar from "../components/app/AppSidebar";
 import DashboardHome from "../components/app/DashboardHome";
@@ -12,6 +12,7 @@ import AutopayHub from "../components/app/AutopayHub";
 import ProfileHub from "../components/app/ProfileHub";
 import WelcomeAuth from "../components/app/WelcomeAuth";
 import AnonymousPaymentHub from "../components/app/AnonymousPaymentHub";
+import StreamingPartnershipHub from "../components/app/StreamingPartnershipHub";
 import { useEffect } from "react";
 import { startRegistration, startAuthentication } from '@simplewebauthn/browser';
 import {
@@ -27,6 +28,12 @@ import { getDashboardSendPrefill } from "@/lib/paymentRequest";
 
 const FACTORY_ID = process.env.NEXT_PUBLIC_FACTORY_ID;
 const WASM_HASH = process.env.NEXT_PUBLIC_WASM_HASH;
+
+const formatBalance2 = (value) => {
+    const num = Number(value);
+    if (!Number.isFinite(num)) return "0.00";
+    return num.toFixed(2);
+};
 
 export default function DashboardPage() {
     const [activeTab, setActiveTab] = useState("home");
@@ -68,8 +75,8 @@ export default function DashboardPage() {
     const fetchBalance = async (childId) => {
         try {
             const data = await getUSDCBalance(childId);
-            if (data.balanceInUsdc) {
-                setBalance(data.balanceInUsdc);
+            if (data?.balanceInUsdc != null) {
+                setBalance(formatBalance2(data.balanceInUsdc));
             }
         } catch (error) {
             console.error("Failed to fetch balance:", error);
@@ -224,6 +231,8 @@ export default function DashboardPage() {
                 return <AddonsScreen onBack={() => setActiveTab("home")} onSelectAddon={setActiveTab} />;
             case "anonymous":
                 return <AnonymousPaymentHub onBack={() => setActiveTab("addons")} user={user} />;
+            case "streaming":
+                return <StreamingPartnershipHub onBack={() => setActiveTab("addons")} user={user} />;
             case "autopay":
                 return <AutopayHub onBack={() => setActiveTab("home")} user={user} />;
             case "profile":
@@ -258,7 +267,7 @@ export default function DashboardPage() {
                     />
                 )}
 
-                <main className="flex-1 w-full px-4 md:px-10 py-6 max-w-7xl mx-auto pb-44 md:pb-6 pt-28 md:pt-0">
+                <main className="flex-1 w-full px-4 md:px-10 py-6 max-w-7xl mx-auto pb-44 md:pb-6 pt-20 md:pt-0">
                     {isAuthLoading ? (
                         <div className="h-full flex items-center justify-center">
                             <div className="w-8 h-8 border-4 border-[#FFB800]/20 border-t-[#FFB800] rounded-full animate-spin"></div>

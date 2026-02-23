@@ -83,7 +83,7 @@ export default function StreamingPartnershipHub({ onBack, user }) {
         [user?.userId]
     );
     const creatorAddress = user?.smartAccountId || "";
-    const creatorName = user?.name || "Creator";
+    const creatorName = String(user?.name ?? "").trim() || "Anonymous";
     const origin = typeof window !== "undefined" ? window.location.origin : "";
 
     const tipLink = useMemo(() => {

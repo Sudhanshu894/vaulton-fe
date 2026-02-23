@@ -154,7 +154,6 @@ export const backendGetCreatorDonations = async (userId) => {
 export const deploySmartAccount = async (factoryId, wasmHash, keyId, passkeyPubkey, userId) => {
     try {
         const response = await api.post('/deploy-child', {
-            factoryId,
             keyId,
             passkeyPubkey,
             userId

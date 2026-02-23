@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { backendUpdateName } from "@/services/backendservices";
+import { BACKEND_API_URL, backendUpdateName } from "@/services/backendservices";
 
 const formatMemberSince = (createdAt) => {
     const date = new Date(createdAt);
@@ -19,13 +19,31 @@ const getProfileInitial = (name) => {
     return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
 };
 
-export default function ProfileHub({ onBack, onLogout, user, onUserUpdated }) {
+const getBackendHost = (backendUrl) => {
+    if (!backendUrl) return "";
+    try {
+        return new URL(backendUrl).hostname.toLowerCase();
+    } catch {
+        return String(backendUrl).replace(/^https?:\/\//i, "").split("/")[0].split(":")[0].toLowerCase();
+    }
+};
+
+const resolveNetworkLabel = (backendUrl) => {
+    const host = getBackendHost(backendUrl);
+    if (!host) return "Unknown";
+    if (host === "vaulton.dahiya.tech") return "Mainnet";
+    if (host === "vaulton-testnet.dahiya.tech" || host === "localhost" || host === "127.0.0.1") return "Testnet";
+    return "Custom";
+};
+
+export default function ProfileHub({ onBack, onLogout, user, onUserUpdated, themeMode = "light", onToggleTheme }) {
     const [subTab, setSubTab] = useState("profile");
     const [displayName, setDisplayName] = useState(user?.name || "");
     const [isSavingName, setIsSavingName] = useState(false);
     const [nameMessage, setNameMessage] = useState({ type: "", text: "" });
 
     const memberSinceLabel = useMemo(() => formatMemberSince(user?.createdAt), [user?.createdAt]);
+    const networkLabel = useMemo(() => resolveNetworkLabel(BACKEND_API_URL), []);
 
     useEffect(() => {
         setDisplayName(user?.name || "");
@@ -134,8 +152,7 @@ export default function ProfileHub({ onBack, onLogout, user, onUserUpdated }) {
                                 <h5 className="text-sm font-black text-[#1A1A2E] uppercase tracking-widest">Preferences</h5>
                                 {[
                                     { label: "Default Currency", val: "USDC", icon: "M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" },
-                                    { label: "Theme", val: "Light", icon: "M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707" },
-                                    { label: "Network", val: "Stellar Mainnet", icon: "M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" },
+                                    { label: "Network", val: networkLabel, icon: "M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" },
                                 ].map(item => (
                                     <div key={item.label} className="flex items-center justify-between group cursor-pointer">
                                         <div className="flex items-center gap-4">
@@ -145,11 +162,29 @@ export default function ProfileHub({ onBack, onLogout, user, onUserUpdated }) {
                                             <span className="text-xs font-bold text-gray-400">{item.label}</span>
                                         </div>
                                         <div className="flex items-center gap-2">
-                                            <span className={`text-xs font-black ${item.val.includes('Mainnet') ? 'text-emerald-500' : 'text-[#1A1A2E]'}`}>{item.val}</span>
+                                            <span className={`text-xs font-black ${item.val === "Mainnet" ? "text-emerald-500" : item.val === "Testnet" ? "text-amber-500" : "text-[#1A1A2E]"}`}>{item.val}</span>
                                             <svg className="w-4 h-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
                                         </div>
                                     </div>
                                 ))}
+                                <button
+                                    type="button"
+                                    onClick={onToggleTheme}
+                                    className="w-full flex items-center justify-between group cursor-pointer"
+                                >
+                                    <span className="flex items-center gap-4">
+                                        <span className="p-3 bg-gray-50 rounded-xl text-gray-400 group-hover:text-[#FFB800] transition-colors">
+                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707" /></svg>
+                                        </span>
+                                        <span className="text-xs font-bold text-gray-400">Theme</span>
+                                    </span>
+                                    <span className="flex items-center gap-3">
+                                        <span className="text-xs font-black text-[#1A1A2E]">{themeMode === "dark" ? "Dark" : "Light"}</span>
+                                        <span className={`w-12 h-7 rounded-full p-1 flex items-center transition-colors ${themeMode === "dark" ? "bg-[#1A1A2E]" : "bg-gray-200"}`}>
+                                            <span className={`w-5 h-5 rounded-full bg-white shadow-sm transition-transform ${themeMode === "dark" ? "translate-x-5" : "translate-x-0"}`}></span>
+                                        </span>
+                                    </span>
+                                </button>
                             </div>
                         </div>
                     </div>

@@ -48,6 +48,7 @@ export default function DashboardPage() {
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [balance, setBalance] = useState("0.00");
     const [user, setUser] = useState(null);
+    const [themeMode, setThemeMode] = useState("light");
     const [isAuthLoading, setIsAuthLoading] = useState(true);
     const [isLoading, setIsLoading] = useState(false);
     const [sendPrefill, setSendPrefill] = useState(null);
@@ -58,6 +59,11 @@ export default function DashboardPage() {
     };
 
     useEffect(() => {
+        const savedTheme = window.localStorage.getItem("vaulton_theme");
+        if (savedTheme === "dark" || savedTheme === "light") {
+            setThemeMode(savedTheme);
+        }
+
         const applyPrefillFromUrl = () => {
             const parsedPrefill = getDashboardSendPrefill(new URLSearchParams(window.location.search));
             setSendPrefill(parsedPrefill);
@@ -104,6 +110,15 @@ export default function DashboardPage() {
             window.removeEventListener("popstate", applyPrefillFromUrl);
         };
     }, []);
+
+    useEffect(() => {
+        const isDark = themeMode === "dark";
+        window.localStorage.setItem("vaulton_theme", isDark ? "dark" : "light");
+        document.documentElement.classList.toggle("theme-dark", isDark);
+        return () => {
+            document.documentElement.classList.remove("theme-dark");
+        };
+    }, [themeMode]);
 
     const fetchBalance = async (childId) => {
         try {
@@ -271,6 +286,10 @@ export default function DashboardPage() {
         persistUserSession(updatedUser);
     };
 
+    const toggleThemeMode = () => {
+        setThemeMode((prev) => (prev === "dark" ? "light" : "dark"));
+    };
+
     const renderContent = () => {
         switch (activeTab) {
             case "home":
@@ -289,14 +308,14 @@ export default function DashboardPage() {
                 return <AutopayHub onBack={() => setActiveTab("home")} user={user} />;
             case "profile":
             case "settings":
-                return <ProfileHub onBack={() => setActiveTab("home")} onLogout={handleLogout} user={user} onUserUpdated={handleUserUpdated} />;
+                return <ProfileHub onBack={() => setActiveTab("home")} onLogout={handleLogout} user={user} onUserUpdated={handleUserUpdated} themeMode={themeMode} onToggleTheme={toggleThemeMode} />;
             default:
                 return <DashboardHome onNavigate={setActiveTab} />;
         }
     };
 
     return (
-        <div className="min-h-screen bg-[#F8F9FB] text-[#1A1A2E] flex flex-col md:flex-row">
+        <div className={`${themeMode === "dark" ? "theme-dark" : ""} min-h-screen bg-[#F8F9FB] text-[#1A1A2E] flex flex-col md:flex-row`}>
             {user && (
                 <AppSidebar
                     isOpen={isSidebarOpen}

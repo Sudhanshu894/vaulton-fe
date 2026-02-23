@@ -12,6 +12,14 @@
   --accent: #FFB800;
 }
 
+:root.theme-dark,
+.theme-dark {
+  --background: #0b1220;
+  --foreground: #e5e7eb;
+  --primary: #e5e7eb;
+  --accent: #FFB800;
+}
+
 .perspective-1000 {
   perspective: 1000px;
 }
@@ -34,6 +42,53 @@ body {
   overflow-x: hidden;
   width: 100%;
   margin: 0 auto;
+}
+
+html.theme-dark body {
+  background: #0b1220;
+  color: #e5e7eb;
+}
+
+.theme-dark .bg-\[\#F8F9FB\] {
+  background-color: #0b1220 !important;
+}
+
+.theme-dark .bg-white {
+  background-color: #111827 !important;
+}
+
+.theme-dark .bg-white\/75,
+.theme-dark .bg-\[\#F8F9FB\]\/80 {
+  background-color: rgba(17, 24, 39, 0.82) !important;
+}
+
+.theme-dark .bg-gray-100 {
+  background-color: #1f2937 !important;
+}
+
+.theme-dark .text-\[\#1A1A2E\] {
+  color: #f9fafb !important;
+}
+
+.theme-dark .text-gray-300 {
+  color: #94a3b8 !important;
+}
+
+.theme-dark .text-gray-400,
+.theme-dark .text-gray-500 {
+  color: #9ca3af !important;
+}
+
+.theme-dark .text-gray-600 {
+  color: #d1d5db !important;
+}
+
+.theme-dark .border-gray-100 {
+  border-color: #374151 !important;
+}
+
+.theme-dark .border-white\/40 {
+  border-color: rgba(148, 163, 184, 0.25) !important;
 }
 
 /* Smooth animations */

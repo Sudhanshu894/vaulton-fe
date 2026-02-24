@@ -1,4 +1,4 @@
-# Vaulton: The Ultimate Keyless Wallet on Stellar
+# Vaulton: The Ultimate Keyless Wallet
 
 Vaulton is a biometric-first keyless wallet designed to bridge the gap between traditional ease-of-use and blockchain security. By leveraging **Passkey** technology and **Account Abstraction on Stellar**, we eliminate the need for complex seed phrases, making crypto transactions as simple as a biometric scan.
 

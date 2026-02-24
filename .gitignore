@@ -7,6 +7,8 @@
 .yarn/*
 /backend
 /vaulton-sdk
+!/vaulton-sdk/
+!/vaulton-sdk/**
 !.yarn/patches
 !.yarn/plugins
 !.yarn/releases

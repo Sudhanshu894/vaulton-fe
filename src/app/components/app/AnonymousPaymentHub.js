@@ -515,8 +515,8 @@ export default function AnonymousPaymentHub({ onBack, user }) {
 
             <section className="bg-white border border-gray-100 rounded-[2rem] p-5 md:p-6 shadow-sm space-y-4">
                 <div>
-                    <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Withdrawal</p>
-                    <h4 className="text-lg font-black text-[#1A1A2E]">Withdraw privately</h4>
+                    <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Transfer</p>
+                    <h4 className="text-lg font-black text-[#1A1A2E]">Transfer privately</h4>
                 </div>
                 <label className="block space-y-2">
                     <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">Recipient wallet</span>
@@ -555,7 +555,7 @@ export default function AnonymousPaymentHub({ onBack, user }) {
                 <StatusMessage status={withdrawStatus} />
             </section>
 
-            <section className="bg-white border border-gray-100 rounded-[2rem] p-5 md:p-6 shadow-sm space-y-4">
+            {/* <section className="bg-white border border-gray-100 rounded-[2rem] p-5 md:p-6 shadow-sm space-y-4">
                 <div>
                     <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Private Transfer</p>
                     <h4 className="text-lg font-black text-[#1A1A2E]">Transfer privately inside ZK pool</h4>
@@ -595,7 +595,7 @@ export default function AnonymousPaymentHub({ onBack, user }) {
                     {isTransferring ? "Transferring..." : "Private Transfer"}
                 </button>
                 <StatusMessage status={transferStatus} />
-            </section>
+            </section> */}
         </div>
     );
 }

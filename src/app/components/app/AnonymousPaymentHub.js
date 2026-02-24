@@ -27,12 +27,19 @@ const getErrorMessage = (error, fallback) => {
     return fallback;
 };
 
-const parsePositiveStroops = (value) => {
+const usdcToStroopsString = (value) => {
     const raw = String(value || "").trim();
-    if (!/^[0-9]+$/.test(raw)) return null;
-    const amount = BigInt(raw);
-    if (amount <= 0n) return null;
-    return raw;
+    if (!raw) return null;
+
+    const normalized = raw.startsWith(".") ? `0${raw}` : raw;
+    if (!/^\d*(?:\.\d{0,7})?$/.test(normalized) || normalized === ".") return null;
+
+    const [wholeRaw, fractionRaw = ""] = normalized.split(".");
+    const whole = BigInt(wholeRaw || "0");
+    const fraction = BigInt((fractionRaw + "0000000").slice(0, 7) || "0");
+    const stroops = whole * STROOPS_PER_USDC + fraction;
+    if (stroops <= 0n) return null;
+    return stroops.toString();
 };
 
 const formatUsdc = (stroopsValue) => {
@@ -233,9 +240,9 @@ export default function AnonymousPaymentHub({ onBack, user }) {
     }, [loadUserState, refreshPoolBalance, userId]);
 
     const handleDeposit = async () => {
-        const amount = parsePositiveStroops(depositAmount);
+        const amount = usdcToStroopsString(depositAmount);
         if (!amount) {
-            setDepositStatus({ type: "error", message: "Enter a valid amount (stroops)." });
+            setDepositStatus({ type: "error", message: "Enter a valid USDC amount." });
             return;
         }
         if (!userId || !zkSmartAccountId) {
@@ -287,14 +294,14 @@ export default function AnonymousPaymentHub({ onBack, user }) {
     };
 
     const handleWithdraw = async () => {
-        const amount = parsePositiveStroops(withdrawAmount);
+        const amount = usdcToStroopsString(withdrawAmount);
         const recipient = String(withdrawRecipient || "").trim();
         if (!recipient) {
             setWithdrawStatus({ type: "error", message: "Enter recipient wallet address." });
             return;
         }
         if (!amount) {
-            setWithdrawStatus({ type: "error", message: "Enter a valid amount (stroops)." });
+            setWithdrawStatus({ type: "error", message: "Enter a valid USDC amount." });
             return;
         }
         if (!userId || !zkSmartAccountId) {
@@ -418,18 +425,21 @@ export default function AnonymousPaymentHub({ onBack, user }) {
                     <h4 className="text-lg font-black text-[#1A1A2E]">Add funds privately</h4>
                 </div>
                 <label className="block space-y-2">
-                    <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">Amount (stroops)</span>
+                    <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">Amount (USDC)</span>
                     <input
                         type="number"
-                        min="1"
-                        step="1"
-                        inputMode="numeric"
+                        min="0"
+                        step="0.0000001"
+                        inputMode="decimal"
                         value={depositAmount}
                         onChange={(event) => setDepositAmount(event.target.value)}
-                        placeholder="e.g. 10000000"
+                        placeholder="e.g. 1 or 2.5"
                         className="w-full rounded-2xl border border-gray-100 bg-[#F8F9FB] px-4 py-3 text-sm font-semibold text-[#1A1A2E] outline-none focus:border-[#FFB800]"
                     />
                 </label>
+                <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">
+                    Converted automatically to stroops (1 USDC = 10,000,000 stroops)
+                </p>
                 <button
                     type="button"
                     onClick={handleDeposit}
@@ -457,18 +467,21 @@ export default function AnonymousPaymentHub({ onBack, user }) {
                     />
                 </label>
                 <label className="block space-y-2">
-                    <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">Amount (stroops)</span>
+                    <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">Amount (USDC)</span>
                     <input
                         type="number"
-                        min="1"
-                        step="1"
-                        inputMode="numeric"
+                        min="0"
+                        step="0.0000001"
+                        inputMode="decimal"
                         value={withdrawAmount}
                         onChange={(event) => setWithdrawAmount(event.target.value)}
-                        placeholder="e.g. 5000000"
+                        placeholder="e.g. 0.5"
                         className="w-full rounded-2xl border border-gray-100 bg-[#F8F9FB] px-4 py-3 text-sm font-semibold text-[#1A1A2E] outline-none focus:border-[#FFB800]"
                     />
                 </label>
+                <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">
+                    Converted automatically to stroops (1 USDC = 10,000,000 stroops)
+                </p>
                 <button
                     type="button"
                     onClick={handleWithdraw}

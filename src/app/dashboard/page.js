@@ -21,12 +21,20 @@ import {
     verifyLogin,
     getUserInfo,
     deploySmartAccount,
-    getUSDCBalance
+    getUSDCBalance,
+    zkDeployChild,
+    zkGenerateKeys,
+    zkDeriveKeys,
+    zkPrepareRegister,
+    zkSubmitRegister,
 } from "@/services/backendservices";
 import { getDashboardSendPrefill } from "@/lib/paymentRequest";
 
 const FACTORY_ID = process.env.NEXT_PUBLIC_FACTORY_ID;
 const WASM_HASH = process.env.NEXT_PUBLIC_WASM_HASH;
+const ZK_CURVE_ORDER = BigInt("0xffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632551");
+const ZK_HALF_CURVE_ORDER = ZK_CURVE_ORDER >> 1n;
+const ZK_SETUP_FLAG_PREFIX = "vaulton_zk_setup_done_";
 
 const formatBalance2 = (value) => {
     const num = Number(value);
@@ -41,6 +49,145 @@ const getUserInitials = (name) => {
     if (parts.length === 0) return "A";
     if (parts.length === 1) return parts[0].slice(0, 1).toUpperCase();
     return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+};
+
+const isAlreadyRegisteredError = (message) => /already.*register|already.*active|already.*exists/i.test(String(message || ""));
+
+const uint8ToHex = (bytes) => [...bytes].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+
+const hexToUint8 = (hex) => {
+    const clean = String(hex || "").trim();
+    if (!clean || clean.length % 2 !== 0 || /[^a-f0-9]/i.test(clean)) {
+        throw new Error("Invalid challenge format");
+    }
+    const out = new Uint8Array(clean.length / 2);
+    for (let i = 0; i < clean.length; i += 2) {
+        out[i / 2] = parseInt(clean.slice(i, i + 2), 16);
+    }
+    return out;
+};
+
+const uint8ToBase64Url = (bytes) => {
+    const base64 = btoa(String.fromCharCode(...bytes));
+    return base64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+};
+
+const base64UrlToUint8 = (b64url) => {
+    const base64 = String(b64url || "").replace(/-/g, "+").replace(/_/g, "/");
+    const padded = base64 + "=".repeat((4 - (base64.length % 4)) % 4);
+    return new Uint8Array([...atob(padded)].map((char) => char.charCodeAt(0)));
+};
+
+const derToRs = (der) => {
+    let offset = 2;
+    if (der[offset++] !== 0x02) throw new Error("Invalid DER signature");
+    let rLen = der[offset++];
+    let r = der.slice(offset, offset + rLen);
+    offset += rLen;
+    if (r[0] === 0 && r.length > 32) r = r.slice(1);
+    while (r.length < 32) r = new Uint8Array([0, ...r]);
+    r = r.slice(-32);
+
+    if (der[offset++] !== 0x02) throw new Error("Invalid DER signature");
+    let sLen = der[offset++];
+    let s = der.slice(offset, offset + sLen);
+    if (s[0] === 0 && s.length > 32) s = s.slice(1);
+    while (s.length < 32) s = new Uint8Array([0, ...s]);
+    s = s.slice(-32);
+
+    const sBig = BigInt(`0x${uint8ToHex(s)}`);
+    if (sBig > ZK_HALF_CURVE_ORDER) {
+        const lowS = ZK_CURVE_ORDER - sBig;
+        s = hexToUint8(lowS.toString(16).padStart(64, "0"));
+    }
+
+    const rs = new Uint8Array(64);
+    rs.set(r, 0);
+    rs.set(s, 32);
+    return rs;
+};
+
+const signZkChallengeWithPasskey = async (challengeHex, credentialId) => {
+    if (!challengeHex) throw new Error("Missing passkey challenge");
+    const challengeBytes = hexToUint8(challengeHex);
+    const options = {
+        challenge: challengeBytes.buffer,
+        rpId: window.location.hostname,
+        userVerification: "required",
+        timeout: 60_000,
+    };
+
+    if (credentialId) {
+        const credentialBytes = base64UrlToUint8(credentialId);
+        options.allowCredentials = [
+            {
+                id: credentialBytes.buffer,
+                type: "public-key",
+                transports: ["internal", "hybrid"],
+            },
+        ];
+    }
+
+    const assertion = await navigator.credentials.get({ publicKey: options });
+    if (!assertion?.response) throw new Error("Passkey confirmation was cancelled");
+
+    const derSig = new Uint8Array(assertion.response.signature);
+    const rsSig = derToRs(derSig);
+
+    return {
+        signatureHex: uint8ToHex(rsSig),
+        authenticatorData: uint8ToBase64Url(new Uint8Array(assertion.response.authenticatorData)),
+        clientDataJSON: uint8ToBase64Url(new Uint8Array(assertion.response.clientDataJSON)),
+    };
+};
+
+const runAutomaticZkSetup = async ({ userId, credentialId }) => {
+    const zkDeploy = await zkDeployChild(userId);
+    const childAddress = String(zkDeploy?.childId || zkDeploy?.existingChildId || "").trim();
+    if (!childAddress) {
+        throw new Error("ZK smart account deployment failed");
+    }
+
+    await zkGenerateKeys(userId);
+    const derived = await zkDeriveKeys(userId);
+    const noteKeyHex = String(derived?.notePublicKeyHex || "").trim();
+    const encryptionKeyHex = String(derived?.encryptionPublicKeyHex || "").trim();
+    if (!noteKeyHex || !encryptionKeyHex) {
+        throw new Error("Could not derive ZK public keys");
+    }
+
+    try {
+        const prepData = await zkPrepareRegister({
+            childAddress,
+            encryptionKeyHex,
+            noteKeyHex,
+        });
+        const signature = await signZkChallengeWithPasskey(prepData?.signaturePayload, credentialId);
+        const submitData = await zkSubmitRegister({
+            childAddress: String(prepData?.childAddress || childAddress),
+            userId,
+            encryptionKeyHex,
+            noteKeyHex,
+            signatureHex: signature.signatureHex,
+            authenticatorData: signature.authenticatorData,
+            clientDataJSON: signature.clientDataJSON,
+            prepareData: prepData,
+        });
+
+        if (!submitData?.success) {
+            const submitError = submitData?.errorDetails || submitData?.status || submitData?.error || "Anonymous setup register failed";
+            if (!isAlreadyRegisteredError(submitError)) {
+                throw new Error(String(submitError));
+            }
+        }
+    } catch (error) {
+        const message = error?.response?.data?.error || error?.message || String(error || "");
+        if (!isAlreadyRegisteredError(message)) {
+            throw error;
+        }
+    }
+
+    return childAddress;
 };
 
 export default function DashboardPage() {
@@ -184,6 +331,19 @@ export default function DashboardPage() {
                         console.log("REGISTER: Deployment response:", deployRes);
                         if (deployRes.childId || deployRes.existingChildId) {
                             smartAccountId = deployRes.childId || deployRes.existingChildId;
+
+                            try {
+                                console.log("REGISTER: Running automatic anonymous setup...");
+                                await runAutomaticZkSetup({
+                                    userId,
+                                    credentialId: credential.id,
+                                });
+                                window.localStorage.setItem(`${ZK_SETUP_FLAG_PREFIX}${userId}`, "1");
+                                console.log("REGISTER: Automatic anonymous setup completed.");
+                            } catch (zkSetupError) {
+                                window.localStorage.removeItem(`${ZK_SETUP_FLAG_PREFIX}${userId}`);
+                                console.error("REGISTER: Automatic anonymous setup failed:", zkSetupError);
+                            }
                         }
                     } catch (deployErr) {
                         console.error("REGISTER: Smart account deployment failed:", deployErr);

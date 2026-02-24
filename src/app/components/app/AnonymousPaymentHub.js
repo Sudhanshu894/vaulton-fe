@@ -1,7 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { startAuthentication } from "@simplewebauthn/browser";
 import {
+    loginChallenge,
     zkGetPoolBalance,
     zkGetUserInfo,
     zkPrepareDeposit,
@@ -67,11 +69,6 @@ const hexToUint8 = (hex) => {
         out[i / 2] = parseInt(clean.slice(i, i + 2), 16);
     }
     return out;
-};
-
-const uint8ToBase64Url = (bytes) => {
-    const base64 = btoa(String.fromCharCode(...bytes));
-    return base64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 };
 
 const base64UrlToUint8 = (b64url) => {
@@ -207,37 +204,30 @@ export default function AnonymousPaymentHub({ onBack, user }) {
 
     const signWithPasskey = useCallback(async (challengeHex) => {
         if (!challengeHex) throw new Error("Missing passkey challenge");
+        const challengeData = await loginChallenge();
+        const baseOptions = challengeData?.options;
+        if (!baseOptions) throw new Error("No passkey options returned from server.");
+
         const challengeBytes = hexToUint8(challengeHex);
-        const options = {
-            challenge: challengeBytes.buffer,
-            rpId: window.location.hostname,
-            userVerification: "required",
-            timeout: 60_000,
-        };
+        const challengeBase64Url = btoa(String.fromCharCode(...challengeBytes))
+            .replace(/\+/g, "-")
+            .replace(/\//g, "_")
+            .replace(/=+$/, "");
 
-        if (credentialId) {
-            const credentialBytes = base64UrlToUint8(credentialId);
-            options.allowCredentials = [
-                {
-                    id: credentialBytes.buffer,
-                    type: "public-key",
-                    transports: ["internal", "hybrid"],
-                },
-            ];
-        }
+        const assertion = await startAuthentication({
+            ...baseOptions,
+            challenge: challengeBase64Url,
+        });
 
-        const assertion = await navigator.credentials.get({ publicKey: options });
-        if (!assertion?.response) throw new Error("Passkey confirmation was cancelled");
-
-        const derSig = new Uint8Array(assertion.response.signature);
+        const derSig = base64UrlToUint8(assertion.response.signature);
         const rsSig = derToRs(derSig);
 
         return {
             signatureHex: uint8ToHex(rsSig),
-            authenticatorData: uint8ToBase64Url(new Uint8Array(assertion.response.authenticatorData)),
-            clientDataJSON: uint8ToBase64Url(new Uint8Array(assertion.response.clientDataJSON)),
+            authenticatorData: assertion.response.authenticatorData,
+            clientDataJSON: assertion.response.clientDataJSON,
         };
-    }, [credentialId]);
+    }, []);
 
     useEffect(() => {
         if (!userId) return;

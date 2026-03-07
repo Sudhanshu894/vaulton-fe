@@ -124,7 +124,13 @@ npm whoami
 npm view vaulton-wallet-sdk name
 ```
 
-If this returns `404`, name is available.
+If this returns `E404`, that is expected before first publish and means the name is available.
+
+Optional cleaner check (without treating E404 as failure in your shell script):
+
+```bash
+npm view vaulton-wallet-sdk version >/dev/null 2>&1 && echo "Name is taken" || echo "Name is available"
+```
 
 2. Dry run publish package:
 

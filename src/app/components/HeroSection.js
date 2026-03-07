@@ -50,7 +50,6 @@ const features = [
 ];
 
 export default function HeroSection() {
-    const [deferredPrompt, setDeferredPrompt] = useState(null);
     const [hoveredIndex, setHoveredIndex] = useState(0);
 
     // Mouse movement parallax effect
@@ -71,28 +70,12 @@ export default function HeroSection() {
             mouseY.set(e.clientY - centerY);
         };
 
-        const handleBeforeInstallPrompt = (e) => {
-            e.preventDefault();
-            setDeferredPrompt(e);
-        };
-
-        window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
         window.addEventListener("mousemove", handleMouseMove);
 
         return () => {
-            window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
             window.removeEventListener("mousemove", handleMouseMove);
         };
     }, [mouseX, mouseY]);
-
-    const handleInstallClick = async () => {
-        if (!deferredPrompt) return;
-        deferredPrompt.prompt();
-        const { outcome } = await deferredPrompt.userChoice;
-        if (outcome === 'accepted') {
-            setDeferredPrompt(null);
-        }
-    };
 
     return (
         <main className="relative flex items-center justify-center min-h-screen lg:h-screen w-full overflow-y-auto lg:overflow-hidden bg-[#FAFAFA] pt-24 lg:pt-0 pb-12 lg:pb-0">
@@ -251,7 +234,7 @@ export default function HeroSection() {
                                     >
                                         <FloatingCard className="p-3 lg:p-4 bg-white/90 backdrop-blur shadow-2xl border border-white/50 rounded-2xl">
                                             <p className="text-[10px] lg:text-xs text-gray-600 leading-tight italic">
-                                                "Transaction Secured. Biometric authentication active."
+                                                &quot;Transaction Secured. Biometric authentication active.&quot;
                                             </p>
                                             <div className="mt-2 flex gap-0.5">
                                                 {[1, 2, 3, 4, 5].map(i => (
@@ -264,30 +247,6 @@ export default function HeroSection() {
                             </AnimatePresence>
                         </div>
 
-                        {/* PWA Download Button - Shifted under visual */}
-                        <div className="absolute -bottom-8 lg:-bottom-16 w-full flex justify-center">
-                            <AnimatePresence>
-                                {deferredPrompt && (
-                                    <motion.button
-                                        initial={{ opacity: 0, y: 10 }}
-                                        animate={{ opacity: 1, y: 0 }}
-                                        exit={{ opacity: 0, y: 10 }}
-                                        onClick={handleInstallClick}
-                                        whileHover={{ scale: 1.02 }}
-                                        whileTap={{ scale: 0.98 }}
-                                        className="group relative flex items-center gap-3 bg-[#1A1A2E] text-white px-8 py-4 lg:px-10 lg:py-4 rounded-2xl font-bold text-base shadow-xl overflow-hidden hover:shadow-2xl transition-all z-30 cursor-pointer"
-                                    >
-                                        <span className="relative z-10 flex items-center gap-3">
-                                            <svg className="w-5 h-5 animate-bounce-slow" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                                            </svg>
-                                            Download Vaulton PWA
-                                        </span>
-                                        <div className="absolute inset-0 bg-gradient-to-r from-[#FFB800] to-[#E6A800] opacity-0 group-hover:opacity-10 transition-opacity duration-300"></div>
-                                    </motion.button>
-                                )}
-                            </AnimatePresence>
-                        </div>
                     </div>
 
                 </div>

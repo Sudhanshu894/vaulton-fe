@@ -67,16 +67,6 @@ export default function Navbar() {
                         ))}
                     </div>
 
-                    {/* Desktop CTA */}
-                    <div className="hidden md:flex items-center gap-4 text-[#1A1A2E] font-medium relative">
-                        <button
-                            onClick={() => router.push("/dashboard")}
-                            className="relative cursor-pointer transition-all duration-300 group overflow-hidden px-6 py-2.5 bg-[#1A1A2E] text-white rounded-full font-bold shadow-lg hover:shadow-xl hover:scale-105 active:scale-95"
-                        >
-                            <span className="relative z-10">Open App</span>
-                        </button>
-                    </div>
-
                     {/* Mobile Menu Button */}
                     <div className="md:hidden flex items-center">
                         <button
@@ -111,14 +101,6 @@ export default function Navbar() {
                                         {link.name}
                                     </button>
                                 ))}
-                                <div className="flex flex-col gap-4 pt-4 border-t border-gray-50">
-                                    <button
-                                        onClick={() => { router.push("/dashboard"); toggleMenu(); }}
-                                        className="w-full py-4 bg-[#1A1A2E] text-white rounded-xl font-bold shadow-md active:scale-95 transition-transform cursor-pointer text-center"
-                                    >
-                                        Open App
-                                    </button>
-                                </div>
                             </div>
                         </motion.div>
                     )}

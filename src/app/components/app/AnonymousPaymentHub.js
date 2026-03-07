@@ -1,12 +1,16 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { startAuthentication } from "@simplewebauthn/browser";
 import {
+    loginChallenge,
     zkGetPoolBalance,
     zkGetUserInfo,
     zkPrepareDeposit,
+    zkPrepareTransfer,
     zkPrepareWithdrawal,
     zkSubmitDeposit,
+    zkSubmitTransfer,
     zkSubmitWithdrawal,
 } from "@/services/backendservices";
 
@@ -27,12 +31,19 @@ const getErrorMessage = (error, fallback) => {
     return fallback;
 };
 
-const parsePositiveStroops = (value) => {
+const usdcToStroopsString = (value) => {
     const raw = String(value || "").trim();
-    if (!/^[0-9]+$/.test(raw)) return null;
-    const amount = BigInt(raw);
-    if (amount <= 0n) return null;
-    return raw;
+    if (!raw) return null;
+
+    const normalized = raw.startsWith(".") ? `0${raw}` : raw;
+    if (!/^\d*(?:\.\d{0,7})?$/.test(normalized) || normalized === ".") return null;
+
+    const [wholeRaw, fractionRaw = ""] = normalized.split(".");
+    const whole = BigInt(wholeRaw || "0");
+    const fraction = BigInt((fractionRaw + "0000000").slice(0, 7) || "0");
+    const stroops = whole * STROOPS_PER_USDC + fraction;
+    if (stroops <= 0n) return null;
+    return stroops.toString();
 };
 
 const formatUsdc = (stroopsValue) => {
@@ -58,11 +69,6 @@ const hexToUint8 = (hex) => {
         out[i / 2] = parseInt(clean.slice(i, i + 2), 16);
     }
     return out;
-};
-
-const uint8ToBase64Url = (bytes) => {
-    const base64 = btoa(String.fromCharCode(...bytes));
-    return base64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 };
 
 const base64UrlToUint8 = (b64url) => {
@@ -119,15 +125,19 @@ export default function AnonymousPaymentHub({ onBack, user }) {
     const [depositAmount, setDepositAmount] = useState("");
     const [withdrawAmount, setWithdrawAmount] = useState("");
     const [withdrawRecipient, setWithdrawRecipient] = useState("");
+    const [transferAmount, setTransferAmount] = useState("");
+    const [transferRecipientUserId, setTransferRecipientUserId] = useState("");
 
     const [infoStatus, setInfoStatus] = useState(null);
     const [balanceStatus, setBalanceStatus] = useState(null);
     const [depositStatus, setDepositStatus] = useState(null);
     const [withdrawStatus, setWithdrawStatus] = useState(null);
+    const [transferStatus, setTransferStatus] = useState(null);
 
     const [isRefreshingBalance, setIsRefreshingBalance] = useState(false);
     const [isDepositing, setIsDepositing] = useState(false);
     const [isWithdrawing, setIsWithdrawing] = useState(false);
+    const [isTransferring, setIsTransferring] = useState(false);
 
     const loadUserState = useCallback(async () => {
         if (!userId) return;
@@ -194,37 +204,30 @@ export default function AnonymousPaymentHub({ onBack, user }) {
 
     const signWithPasskey = useCallback(async (challengeHex) => {
         if (!challengeHex) throw new Error("Missing passkey challenge");
+        const challengeData = await loginChallenge();
+        const baseOptions = challengeData?.options;
+        if (!baseOptions) throw new Error("No passkey options returned from server.");
+
         const challengeBytes = hexToUint8(challengeHex);
-        const options = {
-            challenge: challengeBytes.buffer,
-            rpId: window.location.hostname,
-            userVerification: "required",
-            timeout: 60_000,
-        };
+        const challengeBase64Url = btoa(String.fromCharCode(...challengeBytes))
+            .replace(/\+/g, "-")
+            .replace(/\//g, "_")
+            .replace(/=+$/, "");
 
-        if (credentialId) {
-            const credentialBytes = base64UrlToUint8(credentialId);
-            options.allowCredentials = [
-                {
-                    id: credentialBytes.buffer,
-                    type: "public-key",
-                    transports: ["internal", "hybrid"],
-                },
-            ];
-        }
+        const assertion = await startAuthentication({
+            ...baseOptions,
+            challenge: challengeBase64Url,
+        });
 
-        const assertion = await navigator.credentials.get({ publicKey: options });
-        if (!assertion?.response) throw new Error("Passkey confirmation was cancelled");
-
-        const derSig = new Uint8Array(assertion.response.signature);
+        const derSig = base64UrlToUint8(assertion.response.signature);
         const rsSig = derToRs(derSig);
 
         return {
             signatureHex: uint8ToHex(rsSig),
-            authenticatorData: uint8ToBase64Url(new Uint8Array(assertion.response.authenticatorData)),
-            clientDataJSON: uint8ToBase64Url(new Uint8Array(assertion.response.clientDataJSON)),
+            authenticatorData: assertion.response.authenticatorData,
+            clientDataJSON: assertion.response.clientDataJSON,
         };
-    }, [credentialId]);
+    }, []);
 
     useEffect(() => {
         if (!userId) return;
@@ -233,9 +236,9 @@ export default function AnonymousPaymentHub({ onBack, user }) {
     }, [loadUserState, refreshPoolBalance, userId]);
 
     const handleDeposit = async () => {
-        const amount = parsePositiveStroops(depositAmount);
+        const amount = usdcToStroopsString(depositAmount);
         if (!amount) {
-            setDepositStatus({ type: "error", message: "Enter a valid amount (stroops)." });
+            setDepositStatus({ type: "error", message: "Enter a valid USDC amount." });
             return;
         }
         if (!userId || !zkSmartAccountId) {
@@ -287,14 +290,14 @@ export default function AnonymousPaymentHub({ onBack, user }) {
     };
 
     const handleWithdraw = async () => {
-        const amount = parsePositiveStroops(withdrawAmount);
+        const amount = usdcToStroopsString(withdrawAmount);
         const recipient = String(withdrawRecipient || "").trim();
         if (!recipient) {
             setWithdrawStatus({ type: "error", message: "Enter recipient wallet address." });
             return;
         }
         if (!amount) {
-            setWithdrawStatus({ type: "error", message: "Enter a valid amount (stroops)." });
+            setWithdrawStatus({ type: "error", message: "Enter a valid USDC amount." });
             return;
         }
         if (!userId || !zkSmartAccountId) {
@@ -350,6 +353,72 @@ export default function AnonymousPaymentHub({ onBack, user }) {
         }
     };
 
+    const handleTransfer = async () => {
+        const amount = usdcToStroopsString(transferAmount);
+        const recipientUserId = String(transferRecipientUserId || "").trim();
+
+        if (!recipientUserId) {
+            setTransferStatus({ type: "error", message: "Enter recipient user ID." });
+            return;
+        }
+        if (!amount) {
+            setTransferStatus({ type: "error", message: "Enter a valid USDC amount." });
+            return;
+        }
+        if (!userId || !zkSmartAccountId) {
+            setTransferStatus({ type: "error", message: "Anonymous account is not ready." });
+            return;
+        }
+
+        setIsTransferring(true);
+        setTransferStatus({ type: "info", message: "Preparing private transfer..." });
+
+        try {
+            const prepData = await zkPrepareTransfer({
+                userId,
+                recipientUserId,
+                amount,
+            });
+
+            setTransferStatus({ type: "info", message: "Confirm with passkey..." });
+            const signature = await signWithPasskey(prepData?.signaturePayload);
+
+            const submitData = await zkSubmitTransfer({
+                childAddress: String(prepData?.childAddress || zkSmartAccountId),
+                userId,
+                recipientUserId,
+                proofXdr: prepData?.proofXdr,
+                extDataXdr: prepData?.extDataXdr,
+                signatureHex: signature.signatureHex,
+                authenticatorData: signature.authenticatorData,
+                clientDataJSON: signature.clientDataJSON,
+                credentialId,
+                prepareData: prepData,
+                spentNoteCommitmentHexes: prepData?.spentNoteCommitmentHexes,
+                inputNullifierHexes: prepData?.inputNullifierHexes,
+                recipientNoteData: prepData?.recipientNoteData,
+                senderChangeNoteData: prepData?.senderChangeNoteData,
+                allOutputCommitmentHexes: prepData?.allOutputCommitmentHexes,
+            });
+
+            if (!submitData?.success) {
+                throw new Error(submitData?.errorDetails || submitData?.status || "Private transfer failed");
+            }
+
+            setTransferStatus({ type: "success", message: "Private transfer completed successfully." });
+            setTransferAmount("");
+            setTransferRecipientUserId("");
+            await refreshPoolBalance(true);
+        } catch (error) {
+            setTransferStatus({
+                type: "error",
+                message: getErrorMessage(error, "Private transfer failed"),
+            });
+        } finally {
+            setIsTransferring(false);
+        }
+    };
+
     if (!userId) {
         return (
             <div className="space-y-4 animate-fade-in">
@@ -387,7 +456,7 @@ export default function AnonymousPaymentHub({ onBack, user }) {
                 </button>
                 <h3 className="text-2xl md:text-3xl font-black text-[#1A1A2E]">Anonymous Payments</h3>
                 <p className="text-sm font-semibold text-gray-500">
-                    Simple private deposit and withdrawal.
+                    Private deposit, withdrawal, and transfer.
                 </p>
             </div>
 
@@ -418,18 +487,21 @@ export default function AnonymousPaymentHub({ onBack, user }) {
                     <h4 className="text-lg font-black text-[#1A1A2E]">Add funds privately</h4>
                 </div>
                 <label className="block space-y-2">
-                    <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">Amount (stroops)</span>
+                    <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">Amount (USDC)</span>
                     <input
                         type="number"
-                        min="1"
-                        step="1"
-                        inputMode="numeric"
+                        min="0"
+                        step="0.0000001"
+                        inputMode="decimal"
                         value={depositAmount}
                         onChange={(event) => setDepositAmount(event.target.value)}
-                        placeholder="e.g. 10000000"
+                        placeholder="e.g. 1 or 2.5"
                         className="w-full rounded-2xl border border-gray-100 bg-[#F8F9FB] px-4 py-3 text-sm font-semibold text-[#1A1A2E] outline-none focus:border-[#FFB800]"
                     />
                 </label>
+                <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">
+                    Converted automatically to stroops (1 USDC = 10,000,000 stroops)
+                </p>
                 <button
                     type="button"
                     onClick={handleDeposit}
@@ -443,8 +515,8 @@ export default function AnonymousPaymentHub({ onBack, user }) {
 
             <section className="bg-white border border-gray-100 rounded-[2rem] p-5 md:p-6 shadow-sm space-y-4">
                 <div>
-                    <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Withdrawal</p>
-                    <h4 className="text-lg font-black text-[#1A1A2E]">Withdraw privately</h4>
+                    <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Transfer</p>
+                    <h4 className="text-lg font-black text-[#1A1A2E]">Transfer privately</h4>
                 </div>
                 <label className="block space-y-2">
                     <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">Recipient wallet</span>
@@ -457,18 +529,21 @@ export default function AnonymousPaymentHub({ onBack, user }) {
                     />
                 </label>
                 <label className="block space-y-2">
-                    <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">Amount (stroops)</span>
+                    <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">Amount (USDC)</span>
                     <input
                         type="number"
-                        min="1"
-                        step="1"
-                        inputMode="numeric"
+                        min="0"
+                        step="0.0000001"
+                        inputMode="decimal"
                         value={withdrawAmount}
                         onChange={(event) => setWithdrawAmount(event.target.value)}
-                        placeholder="e.g. 5000000"
+                        placeholder="e.g. 0.5"
                         className="w-full rounded-2xl border border-gray-100 bg-[#F8F9FB] px-4 py-3 text-sm font-semibold text-[#1A1A2E] outline-none focus:border-[#FFB800]"
                     />
                 </label>
+                <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">
+                    Converted automatically to stroops (1 USDC = 10,000,000 stroops)
+                </p>
                 <button
                     type="button"
                     onClick={handleWithdraw}
@@ -479,6 +554,48 @@ export default function AnonymousPaymentHub({ onBack, user }) {
                 </button>
                 <StatusMessage status={withdrawStatus} />
             </section>
+
+            {/* <section className="bg-white border border-gray-100 rounded-[2rem] p-5 md:p-6 shadow-sm space-y-4">
+                <div>
+                    <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Private Transfer</p>
+                    <h4 className="text-lg font-black text-[#1A1A2E]">Transfer privately inside ZK pool</h4>
+                </div>
+                <label className="block space-y-2">
+                    <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">Recipient user ID</span>
+                    <input
+                        type="text"
+                        value={transferRecipientUserId}
+                        onChange={(event) => setTransferRecipientUserId(event.target.value)}
+                        placeholder="e.g. rise_stellar_hackathon_xxxxxxxx"
+                        className="w-full rounded-2xl border border-gray-100 bg-[#F8F9FB] px-4 py-3 text-sm font-semibold text-[#1A1A2E] outline-none focus:border-[#FFB800]"
+                    />
+                </label>
+                <label className="block space-y-2">
+                    <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">Amount (USDC)</span>
+                    <input
+                        type="number"
+                        min="0"
+                        step="0.0000001"
+                        inputMode="decimal"
+                        value={transferAmount}
+                        onChange={(event) => setTransferAmount(event.target.value)}
+                        placeholder="e.g. 0.1"
+                        className="w-full rounded-2xl border border-gray-100 bg-[#F8F9FB] px-4 py-3 text-sm font-semibold text-[#1A1A2E] outline-none focus:border-[#FFB800]"
+                    />
+                </label>
+                <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">
+                    Converted automatically to stroops (1 USDC = 10,000,000 stroops)
+                </p>
+                <button
+                    type="button"
+                    onClick={handleTransfer}
+                    disabled={isTransferring || !zkSmartAccountId}
+                    className="w-full rounded-2xl py-3 px-4 font-black text-sm bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+                >
+                    {isTransferring ? "Transferring..." : "Private Transfer"}
+                </button>
+                <StatusMessage status={transferStatus} />
+            </section> */}
         </div>
     );
 }

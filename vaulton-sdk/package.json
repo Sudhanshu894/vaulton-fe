@@ -1,0 +1,38 @@
+{
+  "name": "vaulton-wallet-sdk",
+  "version": "1.0.0",
+  "description": "Vaulton passkey wallet SDK for signup, login, session management, and USDC transfers.",
+  "type": "module",
+  "main": "./index.js",
+  "module": "./index.js",
+  "types": "./index.d.ts",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "import": "./index.js",
+      "default": "./index.js"
+    }
+  },
+  "files": [
+    "index.js",
+    "index.d.ts",
+    "src",
+    "README.md",
+    "examples/nextjs-wallet-demo"
+  ],
+  "keywords": [
+    "vaulton",
+    "wallet",
+    "passkey",
+    "webauthn",
+    "stellar",
+    "usdc",
+    "sdk"
+  ],
+  "author": "Vaulton",
+  "license": "MIT",
+  "dependencies": {
+    "@simplewebauthn/browser": "^13.2.2"
+  }
+}

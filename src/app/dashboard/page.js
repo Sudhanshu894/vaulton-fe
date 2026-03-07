@@ -35,6 +35,7 @@ const WASM_HASH = process.env.NEXT_PUBLIC_WASM_HASH;
 const ZK_CURVE_ORDER = BigInt("0xffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632551");
 const ZK_HALF_CURVE_ORDER = ZK_CURVE_ORDER >> 1n;
 const ZK_SETUP_FLAG_PREFIX = "vaulton_zk_setup_done_";
+const PASSKEY_CREDENTIAL_KEY_PREFIX = "vaulton_passkey_credential_id_";
 
 const formatBalance2 = (value) => {
     const num = Number(value);
@@ -188,6 +189,42 @@ const runAutomaticZkSetup = async ({ userId, credentialId }) => {
     }
 
     return childAddress;
+};
+
+const getCredentialStorageKey = () => `${PASSKEY_CREDENTIAL_KEY_PREFIX}${window.location.hostname}`;
+
+const getStoredCredentialId = () => {
+    try {
+        const direct = window.localStorage.getItem(getCredentialStorageKey());
+        if (direct) return String(direct);
+
+        const legacy = window.localStorage.getItem("passkeySmartAccount");
+        if (!legacy) return "";
+        const parsed = JSON.parse(legacy);
+        return String(parsed?.credentialId || "");
+    } catch (_) {
+        return "";
+    }
+};
+
+const persistCredentialId = ({ credentialId, userId, smartAccountId, publicKeyHex }) => {
+    if (!credentialId) return;
+    try {
+        window.localStorage.setItem(getCredentialStorageKey(), String(credentialId));
+
+        const prevRaw = window.localStorage.getItem("passkeySmartAccount");
+        const prev = prevRaw ? JSON.parse(prevRaw) : {};
+        const next = {
+            ...prev,
+            currentUser: userId || prev.currentUser || null,
+            smartAccountId: smartAccountId || prev.smartAccountId || null,
+            credentialId: String(credentialId),
+            publicKeyHex: publicKeyHex || prev.publicKeyHex || null,
+        };
+        window.localStorage.setItem("passkeySmartAccount", JSON.stringify(next));
+    } catch (error) {
+        console.warn("Failed to persist credential ID locally", error);
+    }
 };
 
 export default function DashboardPage() {
@@ -360,6 +397,12 @@ export default function DashboardPage() {
                 };
 
                 persistUserSession(newUser);
+                persistCredentialId({
+                    credentialId: credential.id,
+                    userId,
+                    smartAccountId,
+                    publicKeyHex: userInfo.publicKeyHex || passkeyPubkey,
+                });
 
                 if (smartAccountId) {
                     await fetchBalance(smartAccountId);
@@ -390,8 +433,33 @@ export default function DashboardPage() {
                 throw new Error("No passkey options returned from server.");
             }
 
-            // STEP 2: Browser Authentication (Resident Key Discovery)
-            const credential = await startAuthentication(challengeData.options);
+            // STEP 2: Browser Authentication (prefer local platform credential first)
+            const baseOptions = challengeData.options;
+            const storedCredentialId = getStoredCredentialId();
+
+            let credential = null;
+            if (storedCredentialId) {
+                try {
+                    const localPreferredOptions = {
+                        ...baseOptions,
+                        allowCredentials: [
+                            {
+                                id: storedCredentialId,
+                                type: "public-key",
+                                transports: ["internal"],
+                            },
+                        ],
+                    };
+                    credential = await startAuthentication(localPreferredOptions);
+                    console.log("LOGIN: Authenticated using stored local credential preference.");
+                } catch (localOnlyError) {
+                    console.warn("LOGIN: Local-credential-first auth failed, falling back to default discoverable auth.", localOnlyError);
+                }
+            }
+
+            if (!credential) {
+                credential = await startAuthentication(baseOptions);
+            }
             console.log("LOGIN: Browser credential created:", credential);
 
             // STEP 3: Verify Login
@@ -414,6 +482,12 @@ export default function DashboardPage() {
                 };
 
                 persistUserSession(loggedInUser);
+                persistCredentialId({
+                    credentialId: credential.id,
+                    userId: loggedInUser.userId,
+                    smartAccountId: loggedInUser.smartAccountId,
+                    publicKeyHex: userInfo.publicKeyHex || userInfo.passkeyPubkey,
+                });
 
                 if (loggedInUser.smartAccountId) {
                     await fetchBalance(loggedInUser.smartAccountId);

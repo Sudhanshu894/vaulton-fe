@@ -807,7 +807,7 @@ export default function SendScreen({
                             </div>
                         )}
 
-                        {!forceAnonymousMode && !isTipMode && (
+                        {/* {!forceAnonymousMode && !isTipMode && (
                             <div className="bg-white p-6 rounded-[2.5rem] border border-gray-100 space-y-4 shadow-sm">
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-3">
@@ -839,7 +839,7 @@ export default function SendScreen({
                                     </motion.div>
                                 )}
                             </div>
-                        )}
+                        )} */}
 
                         {forceAnonymousMode && (
                             <div className="bg-[#FFF8E7] p-4 rounded-2xl border border-[#FFE2A3] text-sm font-semibold text-[#7A5200]">

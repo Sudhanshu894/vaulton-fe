@@ -214,8 +214,8 @@ export default function ProfileHub({ onBack, onLogout, user, onUserUpdated, them
                                     <div className="w-2 h-2 rounded-full bg-emerald-500/50"></div>
                                 </div>
                                 <code className="text-[10px] font-mono text-emerald-400 block break-all leading-tight">
-                                    npm install @vaulton/wallet-sdk<br />
-                                    <span className="text-blue-400">import</span> {'{'} createVaultonWalletSDK {'}'} <span className="text-blue-400">from</span> <span className="text-orange-400">&quot;@vaulton/wallet-sdk&quot;</span>;<br />
+                                    npm install vaulton-wallet-sdk<br />
+                                    <span className="text-blue-400">import</span> {'{'} createVaultonWalletSDK {'}'} <span className="text-blue-400">from</span> <span className="text-orange-400">&quot;vaulton-wallet-sdk&quot;</span>;<br />
                                     <span className="text-blue-400">const</span> sdk = createVaultonWalletSDK();<br />
                                     <span className="text-blue-400">await</span> sdk.loginAccount();
                                 </code>

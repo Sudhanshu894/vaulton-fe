@@ -2,18 +2,18 @@
 
 import Link from "next/link";
 
-const installSnippet = `npm install @vaulton/wallet-sdk`;
+const installSnippet = `npm install vaulton-wallet-sdk`;
 
-const initSnippet = `import { createVaultonWalletSDK } from "@vaulton/wallet-sdk";
+const initSnippet = `import { createVaultonWalletSDK } from "vaulton-wallet-sdk";
 
 const sdk = createVaultonWalletSDK();
 // Optional override
 // const sdk = createVaultonWalletSDK({ baseURL: "https://vaulton.dahiya.tech" });`;
 
-const flowSnippet = `await sdk.createAccount();     // passkey register + account bootstrap
+const flowSnippet = `await sdk.signupAccount();     // passkey register + account bootstrap
 await sdk.loginAccount();      // passkey login
 
-await sdk.sendUsdc({
+await sdk.transferUsdc({
   recipient: "C...RECIPIENT_ADDRESS",
   amountUsdc: "1.25",
 });
@@ -21,10 +21,10 @@ await sdk.sendUsdc({
 sdk.logoutAccount();`;
 
 const methods = [
-  { name: "createAccount()", desc: "Registers with passkey and creates/loads the smart account session." },
+  { name: "signupAccount()", desc: "Registers with passkey and creates/loads the smart account session." },
   { name: "loginAccount()", desc: "Authenticates with passkey and restores active wallet session." },
   { name: "logoutAccount()", desc: "Clears local SDK session for the current user." },
-  { name: "sendUsdc({ recipient, amountUsdc })", desc: "Checks balance, signs with passkey, and submits transfer." },
+  { name: "transferUsdc({ recipient, amountUsdc })", desc: "Signs with passkey and submits USDC transfer." },
   { name: "getUsdcBalance()", desc: "Returns latest USDC balance for current session wallet." },
   { name: "getAccountInfo(userId?)", desc: "Fetches backend profile info for a user." },
   { name: "getSession()", desc: "Returns local session payload (`userId`, `smartAccountId`, etc.)." },
@@ -47,7 +47,7 @@ export default function SdkDocsPage() {
             Integrate passkey wallet auth and USDC payments into any frontend.
           </p>
           <p className="text-xs md:text-sm text-gray-500">
-            Default backend URL used by SDK: <span className="font-mono text-[#1A1A2E]">https://987b-103-210-33-239.ngrok-free.app</span>
+            Default backend URL used by SDK: <span className="font-mono text-[#1A1A2E]">https://vaulton-testnet.dahiya.tech</span>
           </p>
         </div>
 
@@ -99,4 +99,3 @@ export default function SdkDocsPage() {
     </div>
   );
 }
-

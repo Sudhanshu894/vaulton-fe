@@ -29,6 +29,7 @@ import {
     zkSubmitRegister,
 } from "@/services/backendservices";
 import { getDashboardSendPrefill } from "@/lib/paymentRequest";
+import FtuePasskeyGuide from "../components/app/FtuePasskeyGuide";
 
 const FACTORY_ID = process.env.NEXT_PUBLIC_FACTORY_ID;
 const WASM_HASH = process.env.NEXT_PUBLIC_WASM_HASH;
@@ -36,6 +37,8 @@ const ZK_CURVE_ORDER = BigInt("0xffffffff00000000ffffffffffffffffbce6faada7179e8
 const ZK_HALF_CURVE_ORDER = ZK_CURVE_ORDER >> 1n;
 const ZK_SETUP_FLAG_PREFIX = "vaulton_zk_setup_done_";
 const PASSKEY_CREDENTIAL_KEY_PREFIX = "vaulton_passkey_credential_id_";
+const PASSKEY_PREFERENCE_KEY = "vaulton_passkey_preference";
+const FTUE_SEEN_PREFIX = "vaulton_ftue_seen_";
 
 const formatBalance2 = (value) => {
     const num = Number(value);
@@ -236,6 +239,8 @@ export default function DashboardPage() {
     const [isAuthLoading, setIsAuthLoading] = useState(true);
     const [isLoading, setIsLoading] = useState(false);
     const [sendPrefill, setSendPrefill] = useState(null);
+    const [passkeyPreference, setPasskeyPreference] = useState("device");
+    const [showFtue, setShowFtue] = useState(false);
 
     const persistUserSession = (nextUser) => {
         setUser(nextUser);
@@ -243,6 +248,11 @@ export default function DashboardPage() {
     };
 
     useEffect(() => {
+        const storedPreference = window.localStorage.getItem(PASSKEY_PREFERENCE_KEY);
+        if (storedPreference) {
+            setPasskeyPreference(storedPreference);
+        }
+
         const savedTheme = window.localStorage.getItem("vaulton_theme");
         if (savedTheme === "dark" || savedTheme === "light") {
             setThemeMode(savedTheme);
@@ -328,7 +338,57 @@ export default function DashboardPage() {
         };
     }, [user?.smartAccountId]);
 
-    const handleRegister = async () => {
+    useEffect(() => {
+        if (!user) return;
+        const key = `${FTUE_SEEN_PREFIX}${user.userId || "anonymous"}`;
+        const hasSeen = window.localStorage.getItem(key);
+        if (!hasSeen) {
+            setShowFtue(true);
+            window.localStorage.setItem(key, "1");
+        }
+    }, [user?.userId]);
+
+    const updatePasskeyPreference = (preference) => {
+        setPasskeyPreference(preference);
+        try {
+            window.localStorage.setItem(PASSKEY_PREFERENCE_KEY, preference);
+        } catch (_) {
+            // best effort only
+        }
+    };
+
+    const applyPasskeyPreferenceToOptions = (options, preference) => {
+        if (!options) return options;
+        const patched = {
+            ...options,
+            authenticatorSelection: {
+                ...(options.authenticatorSelection || {}),
+            },
+        };
+
+        const hints = new Set([...(options.hints || [])]);
+
+        if (preference === "security-key") {
+            patched.authenticatorSelection.authenticatorAttachment = "cross-platform";
+            patched.authenticatorSelection.residentKey = "preferred";
+            patched.authenticatorSelection.requireResidentKey = false;
+            hints.add("security-key");
+        } else if (preference === "phone") {
+            patched.authenticatorSelection.authenticatorAttachment = "cross-platform";
+            patched.authenticatorSelection.residentKey = "preferred";
+            hints.add("hybrid");
+        } else {
+            patched.authenticatorSelection.authenticatorAttachment = "platform";
+            patched.authenticatorSelection.residentKey = "required";
+            patched.authenticatorSelection.requireResidentKey = true;
+            hints.add("client-device");
+        }
+
+        patched.hints = Array.from(hints);
+        return patched;
+    };
+
+    const handleRegister = async (preference = passkeyPreference) => {
         setIsLoading(true);
         console.log("REGISTER: Starting registration flow...");
         try {
@@ -337,7 +397,8 @@ export default function DashboardPage() {
             console.log("REGISTER: Challenge data received:", challengeData);
 
             // STEP 2: Browser Registration
-            const credential = await startRegistration(challengeData.options);
+            const registrationOptions = applyPasskeyPreferenceToOptions(challengeData.options, preference);
+            const credential = await startRegistration(registrationOptions);
             console.log("REGISTER: Browser credential created:", credential);
 
             // STEP 3: Verify Registration
@@ -549,52 +610,67 @@ export default function DashboardPage() {
     };
 
     return (
-        <div className={`${themeMode === "dark" ? "theme-dark" : ""} min-h-screen bg-[#F8F9FB] text-[#1A1A2E] flex flex-col md:flex-row`}>
-            {user && (
-                <AppSidebar
-                    isOpen={isSidebarOpen}
-                    onClose={() => setIsSidebarOpen(false)}
-                    setActiveTab={(tab) => {
-                        setActiveTab(tab);
-                        setIsSidebarOpen(false);
-                    }}
-                    activeTab={activeTab}
-                    onLogout={handleLogout}
-                />
-            )}
-
-            <div className={`flex-1 flex flex-col ${user ? "md:pl-[280px]" : ""}`}>
+        <>
+            <div className={`${themeMode === "dark" ? "theme-dark" : ""} min-h-screen bg-[#F8F9FB] text-[#1A1A2E] flex flex-col md:flex-row`}>
                 {user && (
-                    <AppHeader
-                        onMenuClick={() => setIsSidebarOpen(true)}
-                        onProfileClick={() => setActiveTab("profile")}
-                        userName={getUserInitials(user?.name)}
+                    <AppSidebar
+                        isOpen={isSidebarOpen}
+                        onClose={() => setIsSidebarOpen(false)}
+                        setActiveTab={(tab) => {
+                            setActiveTab(tab);
+                            setIsSidebarOpen(false);
+                        }}
+                        activeTab={activeTab}
+                        onLogout={handleLogout}
                     />
                 )}
 
-                <main className="flex-1 w-full px-4 md:px-10 py-6 max-w-7xl mx-auto pb-44 md:pb-6 pt-20 md:pt-0">
-                    {isAuthLoading ? (
-                        <div className="h-full flex items-center justify-center">
-                            <div className="w-8 h-8 border-4 border-[#FFB800]/20 border-t-[#FFB800] rounded-full animate-spin"></div>
-                        </div>
-                    ) : user ? (
-                        renderContent()
-                    ) : (
-                        <div className="max-w-lg mx-auto">
-                            <WelcomeAuth onLogin={handleLogin} onRegister={handleRegister} isLoading={isLoading} />
+                <div className={`flex-1 flex flex-col ${user ? "md:pl-[280px]" : ""}`}>
+                    {user && (
+                        <AppHeader
+                            onMenuClick={() => setIsSidebarOpen(true)}
+                            onProfileClick={() => setActiveTab("profile")}
+                            userName={getUserInitials(user?.name)}
+                        />
+                    )}
+
+                    <main className="flex-1 w-full px-4 md:px-10 py-6 max-w-7xl mx-auto pb-44 md:pb-6 pt-20 md:pt-0">
+                        {isAuthLoading ? (
+                            <div className="h-full flex items-center justify-center">
+                                <div className="w-8 h-8 border-4 border-[#FFB800]/20 border-t-[#FFB800] rounded-full animate-spin"></div>
+                            </div>
+                        ) : user ? (
+                            renderContent()
+                        ) : (
+                            <div className="max-w-lg mx-auto">
+                                <WelcomeAuth
+                                    onLogin={handleLogin}
+                                    onRegister={handleRegister}
+                                    isLoading={isLoading}
+                                    passkeyPreference={passkeyPreference}
+                                    onPasskeyPreferenceChange={updatePasskeyPreference}
+                                />
+                            </div>
+                        )}
+                    </main>
+
+                    {user && (
+                        <div className="md:hidden">
+                            <AppBottomBar
+                                activeTab={activeTab}
+                                setActiveTab={setActiveTab}
+                            />
                         </div>
                     )}
-                </main>
-
-                {user && (
-                    <div className="md:hidden">
-                        <AppBottomBar
-                            activeTab={activeTab}
-                            setActiveTab={setActiveTab}
-                        />
-                    </div>
-                )}
+                </div>
             </div>
-        </div>
+
+            <FtuePasskeyGuide
+                open={showFtue && Boolean(user)}
+                onClose={() => setShowFtue(false)}
+                currentPreference={passkeyPreference}
+                onSelectPreference={updatePasskeyPreference}
+            />
+        </>
     );
 }

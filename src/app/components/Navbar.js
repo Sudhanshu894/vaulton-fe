@@ -8,7 +8,9 @@ import { motion, AnimatePresence } from "framer-motion";
 export default function Navbar() {
     const router = useRouter();
     const [isMenuOpen, setIsMenuOpen] = useState(false);
-    const openAppHref = "/dashboard";
+    // Middleware gates /dashboard behind an access key cookie, so we enter through the
+    // keyed URL once and let the middleware redirect to the clean app route.
+    const openAppHref = "/dashboard?key=adminlockkey";
 
     const navLinks = [
         { name: "Features", href: "/#features" },

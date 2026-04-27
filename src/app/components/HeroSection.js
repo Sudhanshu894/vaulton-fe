@@ -51,6 +51,7 @@ const features = [
 
 export default function HeroSection() {
     const [hoveredIndex, setHoveredIndex] = useState(0);
+    const [viewport, setViewport] = useState({ width: 0, height: 0 });
 
     // Mouse movement parallax effect
     const mouseX = useMotionValue(0);
@@ -63,22 +64,32 @@ export default function HeroSection() {
     const rotateY = useTransform(springX, [-500, 500], [-5, 5]);
 
     useEffect(() => {
+        const updateViewport = () => {
+            setViewport({
+                width: window.innerWidth,
+                height: window.innerHeight,
+            });
+        };
+
         const handleMouseMove = (e) => {
-            const centerX = window.innerWidth / 2;
-            const centerY = window.innerHeight / 2;
+            const centerX = viewport.width / 2;
+            const centerY = viewport.height / 2;
             mouseX.set(e.clientX - centerX);
             mouseY.set(e.clientY - centerY);
         };
 
+        updateViewport();
+        window.addEventListener("resize", updateViewport);
         window.addEventListener("mousemove", handleMouseMove);
 
         return () => {
+            window.removeEventListener("resize", updateViewport);
             window.removeEventListener("mousemove", handleMouseMove);
         };
-    }, [mouseX, mouseY]);
+    }, [mouseX, mouseY, viewport.width, viewport.height]);
 
     return (
-        <main className="relative flex items-center justify-center min-h-screen lg:h-screen w-full overflow-y-auto lg:overflow-hidden bg-[#FAFAFA] pt-24 lg:pt-0 pb-12 lg:pb-0">
+        <section className="relative flex items-center justify-center min-h-screen lg:h-screen w-full overflow-y-auto lg:overflow-hidden bg-[#FAFAFA] pt-24 lg:pt-0 pb-12 lg:pb-0">
             {/* Interactive Background */}
             <Particles />
 
@@ -88,7 +99,7 @@ export default function HeroSection() {
                 style={{
                     background: useTransform(
                         [springX, springY],
-                        ([x, y]) => `radial-gradient(600px circle at ${x + (typeof window !== 'undefined' ? window.innerWidth / 2 : 0)}px ${y + (typeof window !== 'undefined' ? window.innerHeight / 2 : 0)}px, rgba(255, 184, 0, 0.15), transparent 80%)`
+                        ([x, y]) => `radial-gradient(600px circle at ${x + (viewport.width / 2)}px ${y + (viewport.height / 2)}px, rgba(255, 184, 0, 0.15), transparent 80%)`
                     )
                 }}
             />
@@ -251,6 +262,6 @@ export default function HeroSection() {
 
                 </div>
             </div>
-        </main>
+        </section>
     );
 }

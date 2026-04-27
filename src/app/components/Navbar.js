@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from "framer-motion";
 export default function Navbar() {
     const router = useRouter();
     const [isMenuOpen, setIsMenuOpen] = useState(false);
+    const openAppHref = "/dashboard";
 
     const navLinks = [
         { name: "Features", href: "/#features" },
@@ -65,6 +66,13 @@ export default function Navbar() {
                                 <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-[#1A1A2E] group-hover:w-full transition-all duration-300"></span>
                             </button>
                         ))}
+
+                        <button
+                            onClick={() => handleLinkClick(openAppHref)}
+                            className="ml-2 inline-flex items-center justify-center rounded-full bg-[#1A1A2E] px-5 py-3 text-sm font-bold text-white shadow-lg shadow-[#1A1A2E]/10 transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#FFB800] hover:text-[#1A1A2E]"
+                        >
+                            Open App
+                        </button>
                     </div>
 
                     {/* Mobile Menu Button */}
@@ -101,6 +109,13 @@ export default function Navbar() {
                                         {link.name}
                                     </button>
                                 ))}
+
+                                <button
+                                    onClick={() => handleLinkClick(openAppHref)}
+                                    className="mt-2 inline-flex items-center justify-center rounded-2xl bg-[#1A1A2E] px-5 py-4 text-base font-bold text-white shadow-lg shadow-[#1A1A2E]/10 transition-all duration-300 hover:bg-[#FFB800] hover:text-[#1A1A2E]"
+                                >
+                                    Open App
+                                </button>
                             </div>
                         </motion.div>
                     )}

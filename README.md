@@ -129,6 +129,63 @@ Vaulton is designed with a **Trust-Zero Architecture**. Every user interaction i
 
 ---
 
+## Operational Readiness & Enhancements
+
+### User Metrics Tracking
+Vaulton already has clear product events that can be used for analytics, even though a dedicated analytics provider is not wired in yet. The most useful signals are:
+
+- `DAU`: unique users completing passkey login or session restore within a 24-hour window.
+- `Transactions`: sent/received USDC activity from the transaction history screens and `/transactions` API.
+- `Retention`: repeat logins, recurring Autopay usage, and return visits to the dashboard or SDK docs.
+- `Feature adoption`: usage of registration, login, support tickets, and add-on modules such as anonymous payments and streaming partnerships.
+
+These events map directly to the current app flows in `src/app/dashboard/page.js`, `src/app/dashboard/transactions/page.js`, `src/app/components/app/AutopayHub.js`, and `src/services/backendservice.js`.
+
+### Security Checklist Completion
+The current release checklist should be tied to the actual wallet flows in the product:
+
+- Passkey registration, discoverable login, and logout.
+- Session restore from local storage/session state.
+- Smart account deployment after successful registration.
+- Gasless USDC transfer signing and backend relay.
+- Scheduled transaction create, fetch, and cancel flows.
+- Health check availability through the backend `/health` endpoint.
+
+The checklist also covers browser-side security expectations such as WebAuthn-only authentication, no server-side key custody, and safe handling of the passkey challenge payloads.
+
+### Production Monitoring and Logging
+The app currently uses `console.log` and `console.error` in auth, deployment, and transaction flows, which is useful during development but not enough for production operations. The highest-value monitoring targets are:
+
+- Authentication failures in `/auth/register/*` and `/auth/login/*`.
+- Smart account deployment failures in `/wallet/deploy`.
+- Balance and transaction history fetch errors.
+- Autopay scheduling/cancelation failures.
+- Backend health and paymaster availability.
+
+The existing `checkHealth()` helper in `src/services/backendservice.js` gives a natural readiness signal, while centralized logging would make backend and relay issues much easier to diagnose.
+
+### Technical Documentation and User Guide
+This repo already includes several documentation entry points that should be kept in sync:
+
+- The top-level `README.md` for product and setup context.
+- `src/app/sdk-docs/page.js` for the browser-based SDK usage guide.
+- `vaulton-sdk/README.md` for package-level API documentation.
+- `vaulton-sdk/examples/nextjs-wallet-demo` for a working integration example.
+
+A user guide should cover the practical flows a user performs in Vaulton: sign up with a passkey, log in, send USDC, review transaction history, and manage Autopay schedules.
+
+### Advanced Features Implementation
+The codebase already contains the foundation for a few advanced modules beyond the core wallet:
+
+- `AnonymousPaymentHub`: private payment flows built around ZKP-based stealth addresses.
+- `StreamingPartnershipHub`: creator tipping and real-time micro-payment support.
+- `AddonsScreen`: the place where active, live, and roadmap add-ons are surfaced to users.
+- `AI Agent` support is already positioned in the UI as a coming-soon capability for natural-language wallet actions.
+
+These features extend Vaulton from a simple wallet into a broader payment and automation platform without changing the passkey-first model.
+
+---
+
 ## Future Plans & Scope
 Vaulton is committed to evolving beyond a simple wallet into a comprehensive financial ecosystem. Our roadmap includes several ambitious features designed to further democratize access to decentralized finance:
 

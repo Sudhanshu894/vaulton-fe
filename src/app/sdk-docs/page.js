@@ -20,9 +20,19 @@ await sdk.transferUsdc({
 
 sdk.logoutAccount();`;
 
+const restoreSnippet = `const existingSession = sdk.getSession();
+if (existingSession) {
+  // restore UI state from existingSession.smartAccountId
+}
+
+if (!sdk.isLoggedIn()) {
+  await sdk.loginAccount();
+}`;
+
 const methods = [
   { name: "signupAccount()", desc: "Registers with passkey and creates/loads the smart account session." },
   { name: "loginAccount()", desc: "Authenticates with passkey and restores active wallet session." },
+  { name: "restoreSession()", desc: "Returns the locally stored wallet session without a network call." },
   { name: "logoutAccount()", desc: "Clears local SDK session for the current user." },
   { name: "transferUsdc({ recipient, amountUsdc })", desc: "Signs with passkey and submits USDC transfer." },
   { name: "getUsdcBalance()", desc: "Returns latest USDC balance for current session wallet." },
@@ -49,6 +59,9 @@ export default function SdkDocsPage() {
           <p className="text-xs md:text-sm text-gray-500">
             Default backend URL used by SDK: <span className="font-mono text-[#1A1A2E]">https://vaulton-testnet.dahiya.tech</span>
           </p>
+          <p className="text-xs md:text-sm text-gray-500">
+            Use the SDK only inside client components because passkey operations require the browser.
+          </p>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -74,6 +87,16 @@ export default function SdkDocsPage() {
           </pre>
         </section>
 
+        <section className="bg-white border border-gray-100 rounded-3xl p-5 md:p-8 shadow-sm space-y-3">
+          <h2 className="text-base md:text-lg font-black">4. Session Restore</h2>
+          <p className="text-xs md:text-sm text-gray-500">
+            The SDK keeps the current wallet session locally, so a refresh or page revisit can restore the connected account without forcing a new registration.
+          </p>
+          <pre className="bg-[#1A1A2E] text-emerald-300 text-xs md:text-sm rounded-2xl p-4 overflow-x-auto">
+            <code>{restoreSnippet}</code>
+          </pre>
+        </section>
+
         <section className="bg-white border border-gray-100 rounded-3xl p-5 md:p-8 shadow-sm space-y-4">
           <h2 className="text-base md:text-lg font-black">API Methods</h2>
           <div className="space-y-3">
@@ -93,6 +116,9 @@ export default function SdkDocsPage() {
           </p>
           <p className="font-mono text-xs md:text-sm bg-[#F8F9FB] p-3 rounded-xl border border-gray-100">
             vaulton-sdk/examples/nextjs-wallet-demo
+          </p>
+          <p className="text-xs md:text-sm text-gray-500">
+            That demo walks through passkey signup, login, session restore, and USDC transfers in a client-only flow.
           </p>
         </section>
       </div>

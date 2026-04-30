@@ -6,6 +6,7 @@ Use it in any frontend dApp to:
 - Sign up (passkey registration + smart account deploy)
 - Login (passkey auth)
 - Persist/restore/logout wallet session
+- Read account details and USDC balance
 - Transfer USDC
 
 Default backend used by SDK: `https://vaulton-testnet.dahiya.tech`
@@ -25,6 +26,32 @@ const sdk = createVaultonWalletSDK();
 
 // Optional backend override:
 // const sdk = createVaultonWalletSDK({ baseURL: "https://vaulton.dahiya.tech" });
+// or:
+// const sdk = createVaultonWalletSDK({ backendUrl: "https://vaulton.dahiya.tech" });
+```
+
+## Client-Side Use
+
+Passkey methods must run in the browser.
+
+```js
+"use client";
+```
+
+Use the SDK from client components or browser-only scripts. The following flow covers the most common integration path:
+
+```js
+const sdk = createVaultonWalletSDK();
+
+const session = sdk.getSession();
+if (!session) {
+  await sdk.signupAccount();
+} else if (!sdk.isLoggedIn()) {
+  await sdk.loginAccount();
+}
+
+const balance = await sdk.getUsdcBalance();
+console.log(balance);
 ```
 
 ## API
@@ -46,6 +73,14 @@ Authenticates existing user with passkey and stores session locally.
 const session = await sdk.loginAccount();
 ```
 
+### `restoreSession()`
+
+Returns the stored local session without making a network request.
+
+```js
+const session = sdk.restoreSession();
+```
+
 ### `logoutAccount()`
 
 Clears SDK local session.
@@ -60,6 +95,30 @@ Returns stored session object or `null`.
 
 ```js
 const session = sdk.getSession();
+```
+
+### `isLoggedIn()`
+
+Returns `true` when the SDK has a stored user and smart account session.
+
+```js
+const loggedIn = sdk.isLoggedIn();
+```
+
+### `getAccountInfo(userId?)`
+
+Fetches the backend user profile. If `userId` is omitted, the SDK uses the active session.
+
+```js
+const account = await sdk.getAccountInfo();
+```
+
+### `getUsdcBalance(childId?)`
+
+Fetches the current USDC balance for the active smart account. If `childId` is omitted, the SDK uses the active session.
+
+```js
+const balance = await sdk.getUsdcBalance();
 ```
 
 ### `transferUsdc({ recipient, amountUsdc })`
@@ -107,6 +166,14 @@ type VaultonSession = {
 A working sample app is included here:
 
 `vaulton-sdk/examples/nextjs-wallet-demo`
+
+It demonstrates:
+
+- Passkey signup
+- Passkey login
+- Session restore
+- USDC balance lookup
+- USDC transfer
 
 ## Publish To npm (Your Profile)
 
@@ -162,4 +229,5 @@ npm publish --access public
   - `/user-info`
   - `/deploy-child`
   - `/get-nonce`
+  - `/get-usdc-balance`
   - `/transfer-usdc`

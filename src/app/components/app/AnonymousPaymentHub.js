@@ -5,6 +5,7 @@ import { startAuthentication } from "@simplewebauthn/browser";
 import {
     loginChallenge,
     zkGetPoolBalance,
+    zkGetRecipientInfo,
     zkGetUserInfo,
     zkPrepareDeposit,
     zkPrepareTransfer,
@@ -133,6 +134,9 @@ export default function AnonymousPaymentHub({ onBack, user }) {
     const [depositStatus, setDepositStatus] = useState(null);
     const [withdrawStatus, setWithdrawStatus] = useState(null);
     const [transferStatus, setTransferStatus] = useState(null);
+    const [recipientPreview, setRecipientPreview] = useState(null);
+    const [recipientLookupStatus, setRecipientLookupStatus] = useState(null);
+    const [lastSyncedAt, setLastSyncedAt] = useState("");
 
     const [isRefreshingBalance, setIsRefreshingBalance] = useState(false);
     const [isDepositing, setIsDepositing] = useState(false);
@@ -202,6 +206,13 @@ export default function AnonymousPaymentHub({ onBack, user }) {
         }
     }, [userId]);
 
+    const refreshAnonymousDashboard = useCallback(async ({ silent = false } = {}) => {
+        if (!userId) return;
+        await loadUserState();
+        await refreshPoolBalance(silent);
+        setLastSyncedAt(new Date().toISOString());
+    }, [loadUserState, refreshPoolBalance, userId]);
+
     const signWithPasskey = useCallback(async (challengeHex) => {
         if (!challengeHex) throw new Error("Missing passkey challenge");
         const challengeData = await loginChallenge();
@@ -231,9 +242,69 @@ export default function AnonymousPaymentHub({ onBack, user }) {
 
     useEffect(() => {
         if (!userId) return;
-        loadUserState();
-        refreshPoolBalance(true);
-    }, [loadUserState, refreshPoolBalance, userId]);
+        refreshAnonymousDashboard({ silent: true });
+        const pollId = window.setInterval(() => {
+            refreshAnonymousDashboard({ silent: true });
+        }, 30000);
+
+        return () => {
+            window.clearInterval(pollId);
+        };
+    }, [refreshAnonymousDashboard, userId]);
+
+    useEffect(() => {
+        const query = String(transferRecipientUserId || "").trim();
+        if (!query) {
+            const clearTimerId = window.setTimeout(() => {
+                setRecipientPreview(null);
+                setRecipientLookupStatus(null);
+            }, 0);
+            return () => window.clearTimeout(clearTimerId);
+        }
+
+        let cancelled = false;
+        const timerId = window.setTimeout(async () => {
+            setRecipientLookupStatus({ type: "info", message: "Looking up recipient wallet..." });
+
+            try {
+                const info = await zkGetRecipientInfo(query);
+                if (cancelled) return;
+
+                const recipientAddress = String(
+                    info?.zkSmartAccountId || info?.smartAccountId || info?.childId || info?.walletAddress || ""
+                ).trim();
+                const displayName = String(info?.name || info?.displayName || info?.userName || query).trim();
+                const ready = Boolean(recipientAddress);
+
+                const nextPreview = {
+                    recipientUserId: query,
+                    displayName,
+                    recipientAddress,
+                    isReady: ready,
+                    hasPool: Boolean(info?.hasAnonymousAccount ?? info?.enabled ?? ready),
+                };
+                setRecipientPreview(nextPreview);
+                setRecipientLookupStatus({
+                    type: ready ? "success" : "error",
+                    message: ready
+                        ? "Recipient found and ready for a private transfer."
+                        : "Recipient exists, but anonymous wallet details are not ready yet.",
+                });
+            } catch (error) {
+                if (cancelled) return;
+                setRecipientPreview(null);
+                setRecipientLookupStatus({
+                    type: "error",
+                    message: getErrorMessage(error, "Could not look up recipient info"),
+                });
+            }
+        }, 350);
+
+        return () => {
+            cancelled = true;
+            window.clearTimeout(timerId);
+        };
+    }, [transferRecipientUserId]);
 
     const handleDeposit = async () => {
         const amount = usdcToStroopsString(depositAmount);
@@ -468,14 +539,21 @@ export default function AnonymousPaymentHub({ onBack, user }) {
                             ${formatUsdc(poolBalance)} <span className="text-sm text-gray-400 font-bold">USDC</span>
                         </p>
                     </div>
-                    <button
-                        type="button"
-                        onClick={() => refreshPoolBalance(false)}
-                        disabled={isRefreshingBalance}
-                        className="rounded-xl px-4 py-2 text-xs font-black bg-[#F8F9FB] border border-gray-100 text-[#1A1A2E] hover:bg-white disabled:opacity-60 disabled:cursor-not-allowed"
-                    >
-                        {isRefreshingBalance ? "Refreshing..." : "Refresh"}
-                    </button>
+                    <div className="text-right space-y-2">
+                        {lastSyncedAt && (
+                            <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">
+                                Synced {new Date(lastSyncedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
+                            </p>
+                        )}
+                        <button
+                            type="button"
+                            onClick={() => refreshAnonymousDashboard({ silent: false })}
+                            disabled={isRefreshingBalance}
+                            className="rounded-xl px-4 py-2 text-xs font-black bg-[#F8F9FB] border border-gray-100 text-[#1A1A2E] hover:bg-white disabled:opacity-60 disabled:cursor-not-allowed"
+                        >
+                            {isRefreshingBalance ? "Refreshing..." : "Refresh"}
+                        </button>
+                    </div>
                 </div>
                 <StatusMessage status={infoStatus} />
                 <StatusMessage status={balanceStatus} />
@@ -515,8 +593,11 @@ export default function AnonymousPaymentHub({ onBack, user }) {
 
             <section className="bg-white border border-gray-100 rounded-[2rem] p-5 md:p-6 shadow-sm space-y-4">
                 <div>
-                    <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Transfer</p>
-                    <h4 className="text-lg font-black text-[#1A1A2E]">Transfer privately</h4>
+                    <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Withdraw</p>
+                    <h4 className="text-lg font-black text-[#1A1A2E]">Withdraw privately</h4>
+                    <p className="text-sm text-gray-500 font-semibold">
+                        Look up a recipient, confirm their anonymous wallet, and send privately inside the ZK pool.
+                    </p>
                 </div>
                 <label className="block space-y-2">
                     <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">Recipient wallet</span>
@@ -555,7 +636,7 @@ export default function AnonymousPaymentHub({ onBack, user }) {
                 <StatusMessage status={withdrawStatus} />
             </section>
 
-            {/* <section className="bg-white border border-gray-100 rounded-[2rem] p-5 md:p-6 shadow-sm space-y-4">
+            <section className="bg-white border border-gray-100 rounded-[2rem] p-5 md:p-6 shadow-sm space-y-4">
                 <div>
                     <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Private Transfer</p>
                     <h4 className="text-lg font-black text-[#1A1A2E]">Transfer privately inside ZK pool</h4>
@@ -570,6 +651,22 @@ export default function AnonymousPaymentHub({ onBack, user }) {
                         className="w-full rounded-2xl border border-gray-100 bg-[#F8F9FB] px-4 py-3 text-sm font-semibold text-[#1A1A2E] outline-none focus:border-[#FFB800]"
                     />
                 </label>
+                <StatusMessage status={recipientLookupStatus} />
+                {recipientPreview && (
+                    <div className="rounded-2xl border border-gray-100 bg-[#F8F9FB] p-4 space-y-2">
+                        <div className="flex items-center justify-between gap-3">
+                            <p className="text-xs font-black uppercase tracking-widest text-gray-400">Recipient Preview</p>
+                            <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border ${recipientPreview.isReady ? "bg-emerald-50 text-emerald-700 border-emerald-100" : "bg-amber-50 text-amber-700 border-amber-100"}`}>
+                                {recipientPreview.isReady ? "Ready" : "Not ready"}
+                            </span>
+                        </div>
+                        <div className="grid gap-2 text-xs font-semibold text-gray-500">
+                            <p><span className="font-black text-[#1A1A2E]">User ID:</span> {recipientPreview.recipientUserId}</p>
+                            <p><span className="font-black text-[#1A1A2E]">Name:</span> {recipientPreview.displayName || "-"}</p>
+                            <p><span className="font-black text-[#1A1A2E]">Anonymous wallet:</span> {recipientPreview.recipientAddress || "Not available yet"}</p>
+                        </div>
+                    </div>
+                )}
                 <label className="block space-y-2">
                     <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">Amount (USDC)</span>
                     <input
@@ -595,7 +692,7 @@ export default function AnonymousPaymentHub({ onBack, user }) {
                     {isTransferring ? "Transferring..." : "Private Transfer"}
                 </button>
                 <StatusMessage status={transferStatus} />
-            </section> */}
+            </section>
         </div>
     );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import {
     backendGetCreatorDonations,
@@ -71,6 +71,9 @@ export default function StreamingPartnershipHub({ onBack, user }) {
     const [showTipQr, setShowTipQr] = useState(false);
     const [tipQrDataUrl, setTipQrDataUrl] = useState("");
     const [hasCompletedSetup, setHasCompletedSetup] = useState(false);
+    const [lastRefreshedAt, setLastRefreshedAt] = useState("");
+    const [isRefreshing, setIsRefreshing] = useState(false);
+    const mountedRef = useRef(true);
 
     const [donationEnabled, setDonationEnabled] = useState(true);
     const [minTipUsdc, setMinTipUsdc] = useState(DEFAULT_MIN_USDC);
@@ -116,29 +119,32 @@ export default function StreamingPartnershipHub({ onBack, user }) {
         };
     }, [donations]);
 
-    useEffect(() => {
-        if (typeof window === "undefined") return;
-        setHasCompletedSetup(window.localStorage.getItem(setupSeenKey) === "1");
-    }, [setupSeenKey]);
+    const refreshCreatorData = useCallback(
+        async ({ silent = false } = {}) => {
+            if (!user?.userId) {
+                if (mountedRef.current) {
+                    setDonations([]);
+                    setIsLoading(false);
+                    setIsRefreshing(false);
+                }
+                return;
+            }
 
-    useEffect(() => {
-        if (!user?.userId) {
-            setDonations([]);
-            setIsLoading(false);
-            return;
-        }
+            if (mountedRef.current) {
+                if (silent) {
+                    setIsRefreshing(true);
+                } else {
+                    setIsLoading(true);
+                    setLoadError("");
+                }
+            }
 
-        let cancelled = false;
-        setIsLoading(true);
-        setLoadError("");
-
-        (async () => {
             try {
                 const [settingsData, donationsData] = await Promise.all([
                     backendGetCreatorSettings(user.userId),
                     backendGetCreatorDonations(user.userId),
                 ]);
-                if (cancelled) return;
+                if (!mountedRef.current) return;
 
                 const parsedSettings = parseSettings(settingsData);
                 const minUsdc = Number(parsedSettings.minDonationStroops) / STROOPS_PER_USDC;
@@ -152,21 +158,44 @@ export default function StreamingPartnershipHub({ onBack, user }) {
                 );
                 setDisplayDurationSeconds(String(durationSeconds || Number(DEFAULT_DURATION_SECONDS)));
                 setDonations(parseDonations(donationsData));
+                setLastRefreshedAt(new Date().toISOString());
             } catch (error) {
                 console.error("Failed to load streaming partnership data", error);
-                if (!cancelled) {
+                if (!mountedRef.current) return;
+
+                if (!silent) {
                     setLoadError(error?.response?.data?.error || "Failed to load creator settings");
                     setDonations([]);
                 }
             } finally {
-                if (!cancelled) setIsLoading(false);
+                if (!mountedRef.current) return;
+                setIsLoading(false);
+                setIsRefreshing(false);
             }
-        })();
+        },
+        [user?.userId]
+    );
 
+    useEffect(() => {
+        if (typeof window === "undefined") return;
+        setHasCompletedSetup(window.localStorage.getItem(setupSeenKey) === "1");
+    }, [setupSeenKey]);
+
+    useEffect(() => {
+        mountedRef.current = true;
+        refreshCreatorData({ silent: false });
+        const pollId = hasCompletedSetup
+            ? window.setInterval(() => {
+                refreshCreatorData({ silent: true });
+            }, 30000)
+            : null;
         return () => {
-            cancelled = true;
+            mountedRef.current = false;
+            if (pollId) {
+                window.clearInterval(pollId);
+            }
         };
-    }, [user?.userId]);
+    }, [hasCompletedSetup, refreshCreatorData]);
 
     useEffect(() => {
         let cancelled = false;
@@ -205,6 +234,16 @@ export default function StreamingPartnershipHub({ onBack, user }) {
         } catch (error) {
             console.error("Copy failed", error);
         }
+    };
+
+    const handleDownloadTipQr = async () => {
+        if (!tipQrDataUrl) return;
+        const anchor = document.createElement("a");
+        anchor.href = tipQrDataUrl;
+        anchor.download = `vaulton-tip-qr-${creatorSlug || "creator"}.png`;
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
     };
 
     const handleSaveSettings = async () => {
@@ -252,6 +291,7 @@ export default function StreamingPartnershipHub({ onBack, user }) {
             setHasCompletedSetup(true);
             setSaveSuccess("Settings saved");
             setTimeout(() => setSaveSuccess(""), 1400);
+            refreshCreatorData({ silent: true });
         } catch (error) {
             console.error("Failed to save creator settings", error);
             setSaveError(error?.response?.data?.error || error?.message || "Failed to save settings");
@@ -276,16 +316,35 @@ export default function StreamingPartnershipHub({ onBack, user }) {
     return (
         <div className="space-y-6 md:space-y-7 animate-fade-in pb-24">
             <div className="space-y-2">
-                <button onClick={onBack} className="inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-gray-400 hover:text-[#1A1A2E] transition-colors">
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                    </svg>
-                    <span>Add-ons</span>
-                    <span>/</span>
-                    <span className="text-[#1A1A2E]">Streaming Partnership</span>
-                </button>
-                <h2 className="text-2xl md:text-3xl font-black text-[#1A1A2E]">Streaming Partnership</h2>
-                <p className="text-sm text-gray-500 font-semibold">Creator tools for SuperChat links and stream overlays</p>
+                <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+                    <div className="space-y-2">
+                        <button onClick={onBack} className="inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-gray-400 hover:text-[#1A1A2E] transition-colors">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                            </svg>
+                            <span>Add-ons</span>
+                            <span>/</span>
+                            <span className="text-[#1A1A2E]">Streaming Partnership</span>
+                        </button>
+                        <h2 className="text-2xl md:text-3xl font-black text-[#1A1A2E]">Streaming Partnership</h2>
+                        <p className="text-sm text-gray-500 font-semibold">Creator tools for SuperChat links and stream overlays</p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                        {lastRefreshedAt && (
+                            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">
+                                Synced {new Date(lastRefreshedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
+                            </span>
+                        )}
+                        <button
+                            type="button"
+                            onClick={() => refreshCreatorData({ silent: true })}
+                            disabled={isRefreshing || isLoading}
+                            className="px-4 py-2 rounded-full bg-[#1A1A2E] text-white text-[10px] font-black uppercase tracking-[0.2em] disabled:opacity-60"
+                        >
+                            {isRefreshing ? "Syncing..." : "Refresh"}
+                        </button>
+                    </div>
+                </div>
             </div>
 
             {isLoading ? (
@@ -410,6 +469,17 @@ export default function StreamingPartnershipHub({ onBack, user }) {
                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
                                             </svg>
                                         </button>
+                                        {showTipQr && tipQrDataUrl && (
+                                            <button
+                                                onClick={handleDownloadTipQr}
+                                                className="w-9 h-9 rounded-xl border border-gray-100 bg-white flex items-center justify-center text-[#1A1A2E]"
+                                                title="Download QR"
+                                            >
+                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14" />
+                                                </svg>
+                                            </button>
+                                        )}
                                     </div>
                                 </div>
 

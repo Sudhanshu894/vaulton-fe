@@ -40,6 +40,49 @@ const PASSKEY_CREDENTIAL_KEY_PREFIX = "vaulton_passkey_credential_id_";
 const PASSKEY_PREFERENCE_KEY = "vaulton_passkey_preference";
 const FTUE_SEEN_PREFIX = "vaulton_ftue_seen_";
 
+const parseStoredJson = (value) => {
+    if (!value) return null;
+    try {
+        const parsed = JSON.parse(value);
+        if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+        return parsed;
+    } catch (_) {
+        return null;
+    }
+};
+
+const normalizeStoredUser = (value) => {
+    const userId = String(value?.userId || "").trim();
+    const smartAccountId = String(value?.smartAccountId || "").trim();
+    const passkeyPubkey = String(value?.passkeyPubkey || "").trim();
+    const name = String(value?.name || "").trim();
+    const createdAt = String(value?.createdAt || "").trim();
+
+    if (!userId && !smartAccountId) return null;
+
+    return {
+        userId,
+        smartAccountId,
+        passkeyPubkey,
+        name,
+        createdAt,
+    };
+};
+
+const readStoredUserSession = () => {
+    if (typeof window === "undefined") return null;
+
+    const raw = sessionStorage.getItem("vaulton_user");
+    if (!raw) return null;
+
+    const normalized = normalizeStoredUser(parseStoredJson(raw));
+    if (!normalized) {
+        sessionStorage.removeItem("vaulton_user");
+    }
+
+    return normalized;
+};
+
 const formatBalance2 = (value) => {
     const num = Number(value);
     if (!Number.isFinite(num)) return "0.00";
@@ -270,26 +313,25 @@ export default function DashboardPage() {
 
         applyPrefillFromUrl();
 
-        const savedUser = sessionStorage.getItem('vaulton_user');
-        if (savedUser) {
-            const parsedUser = JSON.parse(savedUser);
-            setUser(parsedUser);
-            if (parsedUser.smartAccountId) {
-                fetchBalance(parsedUser.smartAccountId);
+        const storedUser = readStoredUserSession();
+        if (storedUser) {
+            setUser(storedUser);
+            if (storedUser.smartAccountId) {
+                fetchBalance(storedUser.smartAccountId);
             }
-            if (parsedUser.userId) {
-                getUserInfo(parsedUser.userId)
+            if (storedUser.userId) {
+                getUserInfo(storedUser.userId)
                     .then((freshUserInfo) => {
                         const refreshedUser = {
-                            userId: freshUserInfo.userId || parsedUser.userId,
-                            smartAccountId: freshUserInfo.smartAccountId || parsedUser.smartAccountId || "",
-                            passkeyPubkey: freshUserInfo.passkeyPubkey || parsedUser.passkeyPubkey || "",
-                            name: freshUserInfo.name ?? "",
-                            createdAt: freshUserInfo.createdAt || parsedUser.createdAt || "",
+                            userId: String(freshUserInfo.userId || storedUser.userId).trim(),
+                            smartAccountId: String(freshUserInfo.smartAccountId || storedUser.smartAccountId || "").trim(),
+                            passkeyPubkey: String(freshUserInfo.passkeyPubkey || storedUser.passkeyPubkey || "").trim(),
+                            name: String(freshUserInfo.name ?? "").trim(),
+                            createdAt: String(freshUserInfo.createdAt || storedUser.createdAt || "").trim(),
                         };
                         setUser(refreshedUser);
                         sessionStorage.setItem('vaulton_user', JSON.stringify(refreshedUser));
-                        if (refreshedUser.smartAccountId && refreshedUser.smartAccountId !== parsedUser.smartAccountId) {
+                        if (refreshedUser.smartAccountId && refreshedUser.smartAccountId !== storedUser.smartAccountId) {
                             fetchBalance(refreshedUser.smartAccountId);
                         }
                     })
@@ -326,7 +368,7 @@ export default function DashboardPage() {
     };
 
     useEffect(() => {
-        const childId = user?.smartAccountId;
+        const childId = user?.smartAccountId || "";
         if (!childId) return;
 
         const pollId = window.setInterval(() => {
@@ -338,15 +380,16 @@ export default function DashboardPage() {
         };
     }, [user?.smartAccountId]);
 
+    const userId = user?.userId || "";
     useEffect(() => {
-        if (!user) return;
-        const key = `${FTUE_SEEN_PREFIX}${user.userId || "anonymous"}`;
+        if (!userId) return;
+        const key = `${FTUE_SEEN_PREFIX}${userId}`;
         const hasSeen = window.localStorage.getItem(key);
         if (!hasSeen) {
             setShowFtue(true);
             window.localStorage.setItem(key, "1");
         }
-    }, [user?.userId]);
+    }, [userId]);
 
     const updatePasskeyPreference = (preference) => {
         setPasskeyPreference(preference);

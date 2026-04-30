@@ -121,6 +121,24 @@ const isWalletAddress = (value) => {
     return /^[GC][A-Z2-7]{20,}$/.test(text);
 };
 
+const normalizeSession = (value) => {
+    if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+
+    const userId = String(value.userId || "").trim();
+    const smartAccountId = String(value.smartAccountId || "").trim();
+    if (!userId || !smartAccountId) return null;
+
+    return {
+        userId,
+        smartAccountId,
+        passkeyPubkey: String(value.passkeyPubkey || "").trim(),
+        publicKeyHex: String(value.publicKeyHex || value.passkeyPubkey || "").trim(),
+        name: String(value.name || "").trim(),
+        createdAt: String(value.createdAt || "").trim(),
+        credentialId: String(value.credentialId || "").trim(),
+    };
+};
+
 const buildSession = (userInfo, credentialId) => ({
     userId: String(userInfo?.userId || ""),
     smartAccountId: String(userInfo?.smartAccountId || ""),
@@ -158,7 +176,12 @@ export class VaultonWalletSDK {
 
     _writeSession(session) {
         if (!isBrowser()) return;
-        window.localStorage.setItem(this.storageKey, JSON.stringify(session));
+        const nextSession = normalizeSession(session);
+        if (!nextSession) {
+            throw new Error("Invalid session payload.");
+        }
+
+        window.localStorage.setItem(this.storageKey, JSON.stringify(nextSession));
     }
 
     _readSession() {
@@ -166,8 +189,15 @@ export class VaultonWalletSDK {
         const raw = window.localStorage.getItem(this.storageKey);
         if (!raw) return null;
         try {
-            return JSON.parse(raw);
+            const parsed = JSON.parse(raw);
+            const session = normalizeSession(parsed);
+            if (!session) {
+                window.localStorage.removeItem(this.storageKey);
+                return null;
+            }
+            return session;
         } catch (_) {
+            window.localStorage.removeItem(this.storageKey);
             return null;
         }
     }

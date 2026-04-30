@@ -68,11 +68,14 @@ export default function StreamingPartnershipHub({ onBack, user }) {
     const [saveError, setSaveError] = useState("");
     const [saveSuccess, setSaveSuccess] = useState("");
     const [copyState, setCopyState] = useState("");
+    const [obsCopyState, setObsCopyState] = useState("");
     const [showTipQr, setShowTipQr] = useState(false);
     const [tipQrDataUrl, setTipQrDataUrl] = useState("");
     const [hasCompletedSetup, setHasCompletedSetup] = useState(false);
     const [lastRefreshedAt, setLastRefreshedAt] = useState("");
     const [isRefreshing, setIsRefreshing] = useState(false);
+    const [donationSearch, setDonationSearch] = useState("");
+    const [donationSort, setDonationSort] = useState("newest");
     const mountedRef = useRef(true);
 
     const [donationEnabled, setDonationEnabled] = useState(true);
@@ -118,6 +121,41 @@ export default function StreamingPartnershipHub({ onBack, user }) {
             avgUsdc: formatUsdcFromStroops(avgStroops),
         };
     }, [donations]);
+
+    const filteredDonations = useMemo(() => {
+        const query = donationSearch.trim().toLowerCase();
+        const withSearch = query
+            ? donations.filter((donation) => {
+                const sender = String(donation?.senderName || donation?.name || "").toLowerCase();
+                const message = String(donation?.message || "").toLowerCase();
+                const txHash = String(donation?.txHash || donation?.hash || "").toLowerCase();
+                const amount = formatUsdcFromStroops(donation?.amount).toLowerCase();
+                return [sender, message, txHash, amount].some((field) => field.includes(query));
+            })
+            : [...donations];
+
+        const getDonationTime = (item) => {
+            const time = new Date(item?.createdAt || 0).getTime();
+            return Number.isFinite(time) ? time : 0;
+        };
+        const getDonationAmount = (item) => Number(item?.amount || 0);
+
+        withSearch.sort((a, b) => {
+            switch (donationSort) {
+                case "oldest":
+                    return getDonationTime(a) - getDonationTime(b);
+                case "highest":
+                    return getDonationAmount(b) - getDonationAmount(a);
+                case "lowest":
+                    return getDonationAmount(a) - getDonationAmount(b);
+                case "newest":
+                default:
+                    return getDonationTime(b) - getDonationTime(a);
+            }
+        });
+
+        return withSearch;
+    }, [donations, donationSearch, donationSort]);
 
     const refreshCreatorData = useCallback(
         async ({ silent = false } = {}) => {
@@ -246,6 +284,28 @@ export default function StreamingPartnershipHub({ onBack, user }) {
         anchor.remove();
     };
 
+    const handleCopyObsSetup = async () => {
+        if (!overlayLink) return;
+        const text = [
+            "Vaulton OBS Browser Source Setup",
+            "",
+            "1. In OBS, click Sources > + > Browser.",
+            "2. Paste this URL:",
+            overlayLink,
+            "3. Set Width to 1920 and Height to 1080.",
+            "4. Keep the source above gameplay/video layers.",
+            "5. Use the tip link for viewers if you want QR-based tipping.",
+        ].join("\n");
+
+        try {
+            await navigator.clipboard.writeText(text);
+            setObsCopyState("copied");
+            setTimeout(() => setObsCopyState(""), 1400);
+        } catch (error) {
+            console.error("Failed to copy OBS setup", error);
+        }
+    };
+
     const handleSaveSettings = async () => {
         if (!user?.userId) {
             setSaveError("Missing user session");
@@ -299,6 +359,8 @@ export default function StreamingPartnershipHub({ onBack, user }) {
             setIsSaving(false);
         }
     };
+
+    const hasFilter = Boolean(donationSearch.trim()) || donationSort !== "newest";
 
     if (!user?.userId) {
         return (
@@ -518,27 +580,36 @@ export default function StreamingPartnershipHub({ onBack, user }) {
                                         <h3 className="text-base font-black text-[#1A1A2E]">Streaming Overlay Link</h3>
                                         <p className="text-xs text-gray-500 font-semibold">Use this browser-source link in OBS/Streamlabs to show live SuperChats.</p>
                                     </div>
-                                    <button
-                                        onClick={() => handleCopy(overlayLink, "overlay")}
-                                        className={`w-9 h-9 rounded-xl border flex items-center justify-center ${copyState === "overlay" ? "bg-emerald-50 border-emerald-200 text-emerald-600" : "bg-white border-gray-100 text-[#1A1A2E]"}`}
-                                        title={copyState === "overlay" ? "Copied" : "Copy streaming link"}
-                                    >
-                                        {copyState === "overlay" ? (
-                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                                            </svg>
-                                        ) : (
-                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                                            </svg>
-                                        )}
-                                    </button>
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            onClick={handleCopyObsSetup}
+                                            className={`px-3 h-9 rounded-xl border text-[10px] font-black uppercase tracking-[0.2em] ${obsCopyState === "copied" ? "bg-emerald-50 border-emerald-200 text-emerald-600" : "bg-white border-gray-100 text-[#1A1A2E]"}`}
+                                            title="Copy OBS setup"
+                                        >
+                                            {obsCopyState === "copied" ? "Copied" : "Copy OBS Setup"}
+                                        </button>
+                                        <button
+                                            onClick={() => handleCopy(overlayLink, "overlay")}
+                                            className={`w-9 h-9 rounded-xl border flex items-center justify-center ${copyState === "overlay" ? "bg-emerald-50 border-emerald-200 text-emerald-600" : "bg-white border-gray-100 text-[#1A1A2E]"}`}
+                                            title={copyState === "overlay" ? "Copied" : "Copy streaming link"}
+                                        >
+                                            {copyState === "overlay" ? (
+                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                                                </svg>
+                                            ) : (
+                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                                </svg>
+                                            )}
+                                        </button>
+                                    </div>
                                 </div>
                                 <div className="bg-white border border-gray-100 rounded-xl p-3 text-xs font-mono text-[#1A1A2E] break-all">
                                     {overlayLink || "Streaming link unavailable"}
                                 </div>
                                 <p className="text-xs text-gray-500 font-semibold">
-                                    In OBS: add a Browser source and paste this link.
+                                    In OBS: add a Browser source, paste this link, and set the canvas to 1920x1080.
                                 </p>
                             </div>
                         </div>
@@ -600,16 +671,51 @@ export default function StreamingPartnershipHub({ onBack, user }) {
                     <div className="bg-white border border-gray-100 rounded-3xl p-5 md:p-6 space-y-4">
                         <div className="flex items-center justify-between gap-3">
                             <h3 className="text-lg font-black text-[#1A1A2E]">Recent SuperChats</h3>
-                            <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">{donations.length} total</span>
+                            <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">{filteredDonations.length} of {donations.length}</span>
+                        </div>
+
+                        <div className="grid gap-3 md:grid-cols-[1fr_180px]">
+                            <input
+                                value={donationSearch}
+                                onChange={(e) => setDonationSearch(e.target.value)}
+                                placeholder="Search sender, message, tx hash, or amount"
+                                className="w-full bg-[#F8F9FB] border border-gray-100 rounded-2xl px-4 py-3 text-sm font-semibold text-[#1A1A2E] outline-none"
+                            />
+                            <select
+                                value={donationSort}
+                                onChange={(e) => setDonationSort(e.target.value)}
+                                className="w-full bg-[#F8F9FB] border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold text-[#1A1A2E] outline-none"
+                            >
+                                <option value="newest">Newest first</option>
+                                <option value="oldest">Oldest first</option>
+                                <option value="highest">Highest amount</option>
+                                <option value="lowest">Lowest amount</option>
+                            </select>
                         </div>
 
                         {donations.length === 0 ? (
                             <div className="p-6 rounded-2xl bg-[#F8F9FB] border border-dashed border-gray-200 text-center">
                                 <p className="text-sm font-semibold text-gray-500">No SuperChats yet. Transactions will appear here.</p>
                             </div>
+                        ) : filteredDonations.length === 0 ? (
+                            <div className="p-6 rounded-2xl bg-[#F8F9FB] border border-dashed border-gray-200 text-center space-y-2">
+                                <p className="text-sm font-semibold text-gray-500">No SuperChats match your filter.</p>
+                                {hasFilter && (
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setDonationSearch("");
+                                            setDonationSort("newest");
+                                        }}
+                                        className="text-xs font-black uppercase tracking-widest text-[#1A1A2E]"
+                                    >
+                                        Clear filters
+                                    </button>
+                                )}
+                            </div>
                         ) : (
                             <div className="space-y-3">
-                                {donations.map((donation, index) => {
+                                {filteredDonations.map((donation, index) => {
                                     const key = donation?._id || donation?.id || donation?.txHash || `${index}-${donation?.createdAt || "donation"}`;
                                     const senderName = donation?.senderName || donation?.name || "Anonymous";
                                     const message = donation?.message || "";

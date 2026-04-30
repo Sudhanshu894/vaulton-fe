@@ -26,20 +26,39 @@ function OverlayContent() {
 
     const [queue, setQueue] = useState([]);
     const [currentDonation, setCurrentDonation] = useState(null);
+    const [connectionStatus, setConnectionStatus] = useState({
+        state: "connecting",
+        title: "Connecting to creator room",
+        detail: "Waiting for a valid creator address.",
+    });
     const socketRef = useRef(null);
     const isDisplayingRef = useRef(false);
 
     useEffect(() => {
-        // Initialize socket connection
+        if (!creatorAddress) {
+            return undefined;
+        }
+
+        const statusTimer = window.setTimeout(() => {
+            setConnectionStatus({
+                state: "connecting",
+                title: "Connecting to creator room",
+                detail: "Joining the live SuperChat feed.",
+            });
+        }, 0);
+
         const socket = io(backendUrl, {
             transports: ['websocket', 'polling'],
         });
         socketRef.current = socket;
 
         socket.on('connect', () => {
-            if (creatorAddress) {
-                socket.emit('join-creator-room', { creatorAddress });
-            }
+            socket.emit('join-creator-room', { creatorAddress });
+            setConnectionStatus({
+                state: "connected",
+                title: "Connected",
+                detail: `Listening for SuperChats for ${creatorAddress.slice(0, 8)}...`,
+            });
         });
 
         socket.on('superchat', (data) => {
@@ -52,7 +71,24 @@ function OverlayContent() {
             }
         });
 
+        socket.on('disconnect', () => {
+            setConnectionStatus({
+                state: "disconnected",
+                title: "Disconnected",
+                detail: "Waiting to reconnect to the live SuperChat feed.",
+            });
+        });
+
+        socket.on('connect_error', (error) => {
+            setConnectionStatus({
+                state: "error",
+                title: "Connection failed",
+                detail: error?.message || "Unable to reach the overlay backend.",
+            });
+        });
+
         return () => {
+            window.clearTimeout(statusTimer);
             socket.disconnect();
         };
     }, [creatorAddress, backendUrl]);
@@ -60,33 +96,97 @@ function OverlayContent() {
     useEffect(() => {
         // Process queue whenever it changes or a display finishes
         if (!isDisplayingRef.current && queue.length > 0 && !currentDonation) {
-            isDisplayingRef.current = true;
-
             const nextDonation = queue[0];
-            setCurrentDonation(nextDonation);
-            setQueue(prev => prev.slice(1));
+            const timerId = window.setTimeout(() => {
+                if (isDisplayingRef.current) return;
+                isDisplayingRef.current = true;
 
-            const duration = nextDonation.duration || 5000;
+                setCurrentDonation(nextDonation);
+                setQueue(prev => prev.slice(1));
 
-            // Set timeout to hide donation
-            setTimeout(() => {
-                setCurrentDonation(null);
+                const duration = nextDonation.duration || 5000;
 
-                // Set timeout for exit animation before starting next
-                setTimeout(() => {
-                    if (nextDonation.donationId && socketRef.current) {
-                        socketRef.current.emit('superchat-displayed', { donationId: nextDonation.donationId });
-                    }
-                    isDisplayingRef.current = false;
-                    // React state update will trigger next effect run
-                }, 500); // 500ms for exit animation
-            }, duration);
+                // Set timeout to hide donation
+                window.setTimeout(() => {
+                    setCurrentDonation(null);
+
+                    // Set timeout for exit animation before starting next
+                    window.setTimeout(() => {
+                        if (nextDonation.donationId && socketRef.current) {
+                            socketRef.current.emit('superchat-displayed', { donationId: nextDonation.donationId });
+                        }
+                        isDisplayingRef.current = false;
+                        // React state update will trigger next effect run
+                    }, 500); // 500ms for exit animation
+                }, duration);
+            }, 0);
+
+            return () => window.clearTimeout(timerId);
         }
     }, [queue, currentDonation]);
+
+    const queueEmpty = queue.length === 0 && !currentDonation;
+    const roomReady = Boolean(creatorAddress) && connectionStatus.state === "connected";
+    const overlayStatus = creatorAddress
+        ? connectionStatus
+        : {
+            state: "missing-address",
+            title: "Overlay not configured",
+            detail: "Open this overlay with a creator wallet address, or launch it from the streaming dashboard.",
+        };
 
     // Don't render layout elements, just the overlay
     return (
         <div className="fixed inset-0 pointer-events-none flex flex-col items-center justify-end pb-10 bg-transparent font-['Poppins',sans-serif]">
+            {queueEmpty && (!creatorAddress || !roomReady) && (
+                <div className="absolute inset-0 flex items-center justify-center px-4">
+                    <motion.div
+                        initial={{ opacity: 0, scale: 0.98, y: 10 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        className="max-w-lg w-full p-6 rounded-3xl bg-[#0f0f1e]/85 backdrop-blur-md border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.4)] text-white text-center"
+                    >
+                        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-[0.2em] bg-white/10 text-white/80">
+                            <span className={`w-2 h-2 rounded-full ${overlayStatus.state === "connected" ? "bg-emerald-400" : overlayStatus.state === "missing-address" ? "bg-amber-400" : "bg-blue-400"}`} />
+                            <span>{overlayStatus.title}</span>
+                        </div>
+                        <h2 className="mt-4 text-2xl font-black text-white">{overlayStatus.title}</h2>
+                        <p className="mt-2 text-sm text-white/75 leading-relaxed">
+                            {overlayStatus.detail}
+                        </p>
+                        {!creatorAddress ? (
+                            <div className="mt-4 text-left text-xs text-white/70 space-y-2">
+                                <p className="font-bold text-white/90">Testing OBS?</p>
+                                <p>1. Open the Streaming Partnership dashboard.</p>
+                                <p>2. Copy the overlay link from the Streaming Overlay section.</p>
+                                <p>3. Paste it into an OBS Browser source.</p>
+                            </div>
+                        ) : (
+                            <p className="mt-4 text-xs text-white/60">
+                                The overlay will stay transparent until a SuperChat arrives.
+                            </p>
+                        )}
+                    </motion.div>
+                </div>
+            )}
+
+            {queueEmpty && roomReady && (
+                <div className="absolute left-4 top-4 pointer-events-none">
+                    <motion.div
+                        initial={{ opacity: 0, y: -8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="px-4 py-3 rounded-2xl bg-[#0f0f1e]/75 backdrop-blur-md border border-white/10 shadow-lg text-white"
+                    >
+                        <div className="flex items-center gap-2">
+                            <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
+                            <div>
+                                <p className="text-xs font-black uppercase tracking-[0.2em] text-white/80">{overlayStatus.title}</p>
+                                <p className="text-[11px] text-white/60">Waiting for SuperChats.</p>
+                            </div>
+                        </div>
+                    </motion.div>
+                </div>
+            )}
+
             <AnimatePresence>
                 {currentDonation && (
                     <motion.div

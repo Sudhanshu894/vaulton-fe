@@ -22,6 +22,7 @@ import {
     getUserInfo,
     deploySmartAccount,
     getUSDCBalance,
+    checkHealth,
     zkDeployChild,
     zkGenerateKeys,
     zkDeriveKeys,
@@ -284,6 +285,11 @@ export default function DashboardPage() {
     const [sendPrefill, setSendPrefill] = useState(null);
     const [passkeyPreference, setPasskeyPreference] = useState("device");
     const [showFtue, setShowFtue] = useState(false);
+    const [backendHealth, setBackendHealth] = useState({
+        status: "unknown",
+        label: "Checking backend...",
+        checkedAt: "",
+    });
 
     const persistUserSession = (nextUser) => {
         setUser(nextUser);
@@ -344,6 +350,44 @@ export default function DashboardPage() {
         window.addEventListener("popstate", applyPrefillFromUrl);
         return () => {
             window.removeEventListener("popstate", applyPrefillFromUrl);
+        };
+    }, []);
+
+    useEffect(() => {
+        let mounted = true;
+
+        const refreshBackendHealth = async () => {
+            try {
+                const health = await checkHealth();
+                if (!mounted) return;
+
+                const rawStatus = String(health?.status || health?.state || health?.message || "healthy").toLowerCase();
+                const status = rawStatus.includes("down") || rawStatus.includes("error")
+                    ? "offline"
+                    : rawStatus.includes("degrad")
+                        ? "degraded"
+                        : "healthy";
+                const checkedAt = new Date().toISOString();
+                const label = String(health?.message || health?.status || "Backend online").trim() || "Backend online";
+
+                setBackendHealth({ status, label, checkedAt });
+                console.info("[Vaulton Health]", { status, label, checkedAt });
+            } catch (error) {
+                if (!mounted) return;
+
+                const label = error?.response?.data?.error || error?.message || "Backend health check failed";
+                const checkedAt = new Date().toISOString();
+                setBackendHealth({ status: "offline", label, checkedAt });
+                console.warn("[Vaulton Health]", { status: "offline", label, checkedAt });
+            }
+        };
+
+        refreshBackendHealth();
+        const intervalId = window.setInterval(refreshBackendHealth, 60_000);
+
+        return () => {
+            mounted = false;
+            window.clearInterval(intervalId);
         };
     }, []);
 
@@ -674,6 +718,7 @@ export default function DashboardPage() {
                             onMenuClick={() => setIsSidebarOpen(true)}
                             onProfileClick={() => setActiveTab("profile")}
                             userName={getUserInitials(user?.name)}
+                            backendHealth={backendHealth}
                         />
                     )}
 

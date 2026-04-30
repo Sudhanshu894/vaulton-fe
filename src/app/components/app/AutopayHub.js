@@ -292,6 +292,9 @@ export default function AutopayHub({ onBack, user, onDataChanged }) {
     const [nowMs, setNowMs] = useState(() => Date.now());
     const [isLoadingList, setIsLoadingList] = useState(false);
     const [listError, setListError] = useState("");
+    const [searchTerm, setSearchTerm] = useState("");
+    const [statusFilter, setStatusFilter] = useState("all");
+    const [sortMode, setSortMode] = useState("due");
 
     const [isCreateOpen, setIsCreateOpen] = useState(false);
     const [form, setForm] = useState({ recipient: "", amount: "", scheduledAt: "" });
@@ -320,6 +323,55 @@ export default function AutopayHub({ onBack, user, onDataChanged }) {
         () => transfers.filter((item) => item.status === "pending"),
         [transfers]
     );
+    const filteredTransfers = useMemo(() => {
+        const query = searchTerm.trim().toLowerCase();
+        const matchesQuery = (item) => {
+            if (!query) return true;
+            const fields = [
+                item?.recipient,
+                item?.status,
+                item?.id,
+                item?.txHash,
+                item?.error,
+                formatStroopsToUsdc(item?.amount),
+            ].map((field) => String(field || "").toLowerCase());
+            return fields.some((field) => field.includes(query));
+        };
+
+        const matchesStatus = (item) => {
+            if (statusFilter === "all") return true;
+            return String(item?.status || "") === statusFilter;
+        };
+
+        const getSortTime = (item) => {
+            const time = new Date(item?.scheduledTime || item?.deadline || item?.createdAt || 0).getTime();
+            return Number.isFinite(time) ? time : 0;
+        };
+
+        const getAmount = (item) => {
+            try {
+                return BigInt(String(item?.amount || 0));
+            } catch {
+                return 0n;
+            }
+        };
+
+        const items = transfers.filter((item) => matchesQuery(item) && matchesStatus(item));
+        items.sort((a, b) => {
+            switch (sortMode) {
+                case "newest":
+                    return getSortTime(b) - getSortTime(a);
+                case "highest":
+                    return getAmount(b) > getAmount(a) ? 1 : getAmount(b) < getAmount(a) ? -1 : 0;
+                case "lowest":
+                    return getAmount(a) > getAmount(b) ? 1 : getAmount(a) < getAmount(b) ? -1 : 0;
+                case "due":
+                default:
+                    return getSortTime(a) - getSortTime(b);
+            }
+        });
+        return items;
+    }, [searchTerm, statusFilter, sortMode, transfers]);
     const hasDuePendingTransfers = useMemo(
         () => pendingTransfers.some((item) => {
             const scheduledAtMs = new Date(item.scheduledTime || item.deadline || 0).getTime();
@@ -655,6 +707,7 @@ export default function AutopayHub({ onBack, user, onDataChanged }) {
 
     const activeCount = activeTransfers.length;
     const completedCount = transfers.filter((item) => item.status === "completed").length;
+    const hasFilters = Boolean(searchTerm.trim()) || statusFilter !== "all" || sortMode !== "due";
 
     return (
         <div className="space-y-8 pb-24 animate-fade-in">
@@ -675,11 +728,11 @@ export default function AutopayHub({ onBack, user, onDataChanged }) {
                     </div>
                 </div>
 
-                <div className="flex items-center gap-3">
-                    <button
-                        onClick={() => loadTransfers()}
-                        type="button"
-                        className="px-4 py-3 rounded-2xl bg-white border border-gray-100 font-bold text-[#1A1A2E] shadow-sm hover:shadow-md disabled:opacity-50"
+                    <div className="flex items-center gap-3">
+                        <button
+                            onClick={() => loadTransfers()}
+                            type="button"
+                            className="px-4 py-3 rounded-2xl bg-white border border-gray-100 font-bold text-[#1A1A2E] shadow-sm hover:shadow-md disabled:opacity-50"
                         disabled={isLoadingList}
                     >
                         {isLoadingList ? "Refreshing..." : "Refresh"}
@@ -739,22 +792,90 @@ export default function AutopayHub({ onBack, user, onDataChanged }) {
                         </div>
                     </div>
 
-                    <div className="bg-white rounded-[2rem] md:rounded-[3rem] border border-gray-100 shadow-sm p-6 md:p-8 space-y-6">
-                        <div className="flex items-center justify-between gap-4">
-                            <div>
-                                <h3 className="text-xl md:text-2xl font-black text-[#1A1A2E]">All Autopay</h3>
-                                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Status-aware scheduled payment list</p>
-                            </div>
-                            <div className="text-right">
-                                <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Wallet</p>
-                                <p className="text-xs font-mono text-gray-500">{shortAddress(walletAddress, 10, 8)}</p>
-                            </div>
+                <div className="bg-white rounded-[2rem] md:rounded-[3rem] border border-gray-100 shadow-sm p-6 md:p-8 space-y-6">
+                    <div className="flex items-center justify-between gap-4">
+                        <div>
+                            <h3 className="text-xl md:text-2xl font-black text-[#1A1A2E]">All Autopay</h3>
+                            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">
+                                {filteredTransfers.length} of {transfers.length} scheduled payments
+                            </p>
                         </div>
+                        <div className="text-right">
+                            <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Wallet</p>
+                            <p className="text-xs font-mono text-gray-500">{shortAddress(walletAddress, 10, 8)}</p>
+                        </div>
+                    </div>
 
-                        {isLoadingList && transfers.length === 0 ? (
-                            <div className="p-8 rounded-2xl bg-gray-50 border border-dashed border-gray-200 text-center text-sm font-bold text-gray-400">
-                                Loading scheduled autopay payments...
-                            </div>
+                    <div className="grid gap-3 lg:grid-cols-[1fr_180px_180px]">
+                        <input
+                            type="text"
+                            value={searchTerm}
+                            onChange={(event) => setSearchTerm(event.target.value)}
+                            placeholder="Search recipient, amount, status, or hash"
+                            className="w-full rounded-2xl border border-gray-100 bg-[#F8F9FB] px-4 py-3 text-sm font-semibold text-[#1A1A2E] outline-none focus:border-[#FFB800]"
+                        />
+                        <select
+                            value={statusFilter}
+                            onChange={(event) => setStatusFilter(event.target.value)}
+                            className="w-full rounded-2xl border border-gray-100 bg-[#F8F9FB] px-4 py-3 text-sm font-bold text-[#1A1A2E] outline-none focus:border-[#FFB800]"
+                        >
+                            <option value="all">All statuses</option>
+                            <option value="pending">Pending</option>
+                            <option value="executing">Executing</option>
+                            <option value="completed">Completed</option>
+                            <option value="cancelled">Cancelled</option>
+                            <option value="failed">Failed</option>
+                            <option value="consumed">Consumed</option>
+                        </select>
+                        <select
+                            value={sortMode}
+                            onChange={(event) => setSortMode(event.target.value)}
+                            className="w-full rounded-2xl border border-gray-100 bg-[#F8F9FB] px-4 py-3 text-sm font-bold text-[#1A1A2E] outline-none focus:border-[#FFB800]"
+                        >
+                            <option value="due">Due soonest</option>
+                            <option value="newest">Newest first</option>
+                            <option value="highest">Highest amount</option>
+                            <option value="lowest">Lowest amount</option>
+                        </select>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2">
+                        {[
+                            ["all", "All"],
+                            ["pending", "Pending"],
+                            ["executing", "Executing"],
+                            ["completed", "Completed"],
+                            ["cancelled", "Cancelled"],
+                            ["failed", "Failed"],
+                        ].map(([key, label]) => (
+                            <button
+                                key={key}
+                                type="button"
+                                onClick={() => setStatusFilter(key)}
+                                className={`px-3 py-2 rounded-full border text-[10px] font-black uppercase tracking-[0.2em] ${statusFilter === key ? "bg-[#1A1A2E] text-white border-[#1A1A2E]" : "bg-white text-gray-500 border-gray-100"}`}
+                            >
+                                {label}
+                            </button>
+                        ))}
+                        {hasFilters && (
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setSearchTerm("");
+                                    setStatusFilter("all");
+                                    setSortMode("due");
+                                }}
+                                className="px-3 py-2 rounded-full border border-[#FFB800]/40 bg-[#FFB800]/10 text-[10px] font-black uppercase tracking-[0.2em] text-[#B7791F]"
+                            >
+                                Clear filters
+                            </button>
+                        )}
+                    </div>
+
+                    {isLoadingList && transfers.length === 0 ? (
+                        <div className="p-8 rounded-2xl bg-gray-50 border border-dashed border-gray-200 text-center text-sm font-bold text-gray-400">
+                            Loading scheduled autopay payments...
+                        </div>
                         ) : listError ? (
                             <div className="p-3 rounded-xl bg-red-50 border border-red-100 text-red-700 text-xs font-semibold" title={listError}>
                                 {compactErrorMessage(listError, 130)}
@@ -764,9 +885,14 @@ export default function AutopayHub({ onBack, user, onDataChanged }) {
                                 <p className="text-base font-black text-[#1A1A2E]">No scheduled autopay payments yet</p>
                                 <p className="text-sm font-semibold text-gray-400">Create one to see its schedule and status here.</p>
                             </div>
+                        ) : filteredTransfers.length === 0 ? (
+                            <div className="p-8 rounded-2xl bg-gray-50 border border-dashed border-gray-200 text-center space-y-2">
+                                <p className="text-base font-black text-[#1A1A2E]">No autopay items match your filters</p>
+                                <p className="text-sm font-semibold text-gray-400">Try a different status, search term, or sort order.</p>
+                            </div>
                         ) : (
                             <div className="space-y-4">
-                                {transfers.map((item) => {
+                                {filteredTransfers.map((item) => {
                                     const isPending = item.status === "pending";
                                     const isBusy = actionState.txId === item.id;
                                     const scheduledAtMs = new Date(item.scheduledTime || item.deadline || 0).getTime();
